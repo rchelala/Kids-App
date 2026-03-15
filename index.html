@@ -12,8 +12,7 @@
   <title>Touch & Play</title>
   <style>
     * {
-      margin: 0;
-      padding: 0;
+      margin: 0; padding: 0;
       box-sizing: border-box;
       -webkit-tap-highlight-color: transparent;
       -webkit-touch-callout: none;
@@ -21,10 +20,16 @@
       user-select: none;
     }
     html, body {
-      width: 100%;
-      height: 100%;
+      width: 100%; height: 100%;
       overflow: hidden;
       background: #000;
+      display: flex;
+      flex-direction: column;
+    }
+    #canvas-wrap {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
       touch-action: none;
     }
     canvas {
@@ -34,237 +39,521 @@
       cursor: none;
     }
     #hint {
-      position: fixed;
-      bottom: 40px;
+      position: absolute;
+      bottom: 20px;
       left: 50%;
       transform: translateX(-50%);
-      color: rgba(255,255,255,0.35);
+      color: rgba(255,255,255,0.4);
       font-family: -apple-system, sans-serif;
-      font-size: 18px;
+      font-size: 16px;
       letter-spacing: 2px;
-      text-align: center;
+      white-space: nowrap;
       pointer-events: none;
-      transition: opacity 1s;
+      transition: opacity 1.2s;
     }
+    /* ── Toolbar ─────────────────────────────────────────── */
+    #toolbar {
+      flex-shrink: 0;
+      height: calc(84px + env(safe-area-inset-bottom));
+      padding-bottom: env(safe-area-inset-bottom);
+      background: rgba(10, 10, 10, 0.95);
+      border-top: 1px solid rgba(255,255,255,0.08);
+      display: flex;
+      align-items: center;
+      overflow-x: auto;
+      overflow-y: hidden;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+      gap: 6px;
+      padding-left: 10px;
+      padding-right: 10px;
+      touch-action: pan-x;
+    }
+    #toolbar::-webkit-scrollbar { display: none; }
+
+    .mode-btn {
+      flex-shrink: 0;
+      width: 68px;
+      height: 68px;
+      border-radius: 16px;
+      border: 2px solid rgba(255,255,255,0.1);
+      background: rgba(255,255,255,0.05);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2px;
+      cursor: pointer;
+      transition: transform 0.12s, border-color 0.2s, background 0.2s;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+    }
+    .mode-btn .icon { font-size: 28px; line-height: 1; }
+    .mode-btn .label {
+      font-family: -apple-system, sans-serif;
+      font-size: 9px;
+      color: rgba(255,255,255,0.5);
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+    .mode-btn.active {
+      border-color: rgba(255,255,255,0.7);
+      background: rgba(255,255,255,0.14);
+      transform: scale(1.06);
+    }
+    .mode-btn.active .label { color: rgba(255,255,255,0.9); }
+    .mode-btn:active { transform: scale(0.93); }
   </style>
 </head>
 <body>
+
+<div id="canvas-wrap">
   <canvas id="c"></canvas>
   <div id="hint">touch anywhere ✨</div>
+</div>
 
-  <script>
-    const canvas = document.getElementById('c');
-    const ctx = canvas.getContext('2d');
-    const hint = document.getElementById('hint');
+<div id="toolbar">
+  <button class="mode-btn active" data-mode="sparkle">
+    <span class="icon">✨</span><span class="label">Sparkles</span>
+  </button>
+  <button class="mode-btn" data-mode="star">
+    <span class="icon">⭐</span><span class="label">Stars</span>
+  </button>
+  <button class="mode-btn" data-mode="heart">
+    <span class="icon">❤️</span><span class="label">Hearts</span>
+  </button>
+  <button class="mode-btn" data-mode="bubble">
+    <span class="icon">🫧</span><span class="label">Bubbles</span>
+  </button>
+  <button class="mode-btn" data-mode="balloon">
+    <span class="icon">🎈</span><span class="label">Balloons</span>
+  </button>
+  <button class="mode-btn" data-mode="butterfly">
+    <span class="icon">🦋</span><span class="label">Butterflies</span>
+  </button>
+  <button class="mode-btn" data-mode="flower">
+    <span class="icon">🌸</span><span class="label">Flowers</span>
+  </button>
+  <button class="mode-btn" data-mode="dino">
+    <span class="icon">🦕</span><span class="label">Dinos</span>
+  </button>
+</div>
 
-    let W, H;
-    let particles = [];
-    let blobs = [];
-    let touched = false;
-    let hintHidden = false;
-    let animId;
+<script>
+  // ── Setup ──────────────────────────────────────────────────────────────────
+  const wrap   = document.getElementById('canvas-wrap');
+  const canvas = document.getElementById('c');
+  const ctx    = canvas.getContext('2d');
+  const hint   = document.getElementById('hint');
+  const dpr    = devicePixelRatio || 1;
 
-    // Touch hue per touch identifier
-    const touchHues = new Map();
+  let W, H;
+  let items = [];          // all active visual items
+  let hintHidden = false;
+  let currentMode = 'sparkle';
+  const touchHues = new Map();
 
-    function resize() {
-      W = canvas.width = window.innerWidth * devicePixelRatio;
-      H = canvas.height = window.innerHeight * devicePixelRatio;
-      canvas.style.width = window.innerWidth + 'px';
-      canvas.style.height = window.innerHeight + 'px';
+  function resize() {
+    const r = wrap.getBoundingClientRect();
+    W = canvas.width  = r.width  * dpr;
+    H = canvas.height = r.height * dpr;
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  // ── Mode buttons ───────────────────────────────────────────────────────────
+  document.querySelectorAll('.mode-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelector('.mode-btn.active').classList.remove('active');
+      btn.classList.add('active');
+      currentMode = btn.dataset.mode;
+    });
+  });
+
+  // ── Helpers ────────────────────────────────────────────────────────────────
+  const px = n => n * dpr;
+
+  function getHue(id) {
+    if (!touchHues.has(id)) touchHues.set(id, Math.random() * 360);
+    return touchHues.get(id);
+  }
+  function shiftHue(id, amt = 2) {
+    const h = (getHue(id) + amt) % 360;
+    touchHues.set(id, h);
+    return h;
+  }
+
+  function hideHint() {
+    if (!hintHidden) {
+      hintHidden = true;
+      hint.style.opacity = '0';
+      setTimeout(() => hint.remove(), 1400);
     }
+  }
 
-    window.addEventListener('resize', resize);
-    resize();
+  // ── Item classes ───────────────────────────────────────────────────────────
 
-    // ── Particle (sparkle trail) ─────────────────────────────────────────────
-    class Particle {
-      constructor(x, y, hue) {
-        this.x = x;
-        this.y = y;
-        this.hue = hue;
-        this.size = (Math.random() * 18 + 8) * devicePixelRatio;
-        this.alpha = 1;
-        this.decay = Math.random() * 0.018 + 0.008;
-        this.vx = (Math.random() - 0.5) * 4 * devicePixelRatio;
-        this.vy = (Math.random() - 0.5) * 4 * devicePixelRatio;
-        this.gravity = 0.12 * devicePixelRatio;
-        this.sat = Math.random() * 30 + 70;  // 70-100%
-        this.light = Math.random() * 20 + 50; // 50-70%
-      }
-      update() {
-        this.x += this.vx;
-        this.y += this.vy;
-        this.vy += this.gravity;
-        this.alpha -= this.decay;
-        this.size *= 0.985;
-      }
-      draw() {
-        ctx.save();
-        ctx.globalAlpha = Math.max(0, this.alpha);
-        const grd = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, this.size);
-        grd.addColorStop(0, `hsl(${this.hue}, ${this.sat}%, ${this.light}%)`);
-        grd.addColorStop(1, `hsla(${this.hue}, ${this.sat}%, ${this.light}%, 0)`);
-        ctx.fillStyle = grd;
-        ctx.beginPath();
-        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
-      }
+  // Sparkle (original glowing blob)
+  class Sparkle {
+    constructor(x, y, hue) {
+      this.x = x; this.y = y; this.hue = hue;
+      this.size = px(Math.random() * 18 + 8);
+      this.alpha = 1;
+      this.decay = Math.random() * 0.018 + 0.008;
+      this.vx = (Math.random() - 0.5) * px(4);
+      this.vy = (Math.random() - 0.5) * px(4);
+      this.gravity = px(0.12);
+      this.sat   = Math.random() * 30 + 70;
+      this.light = Math.random() * 20 + 50;
     }
-
-    // ── Blob (expanding ring on tap) ────────────────────────────────────────
-    class Blob {
-      constructor(x, y, hue) {
-        this.x = x;
-        this.y = y;
-        this.hue = hue;
-        this.r = 10 * devicePixelRatio;
-        this.maxR = (Math.random() * 140 + 80) * devicePixelRatio;
-        this.alpha = 0.9;
-        this.lineWidth = (Math.random() * 8 + 4) * devicePixelRatio;
-        this.sat = 100;
-        this.light = 60;
-        this.growing = true;
-      }
-      update() {
-        if (this.growing) {
-          this.r += (this.maxR - this.r) * 0.08;
-          if (this.r > this.maxR * 0.95) this.growing = false;
-        }
-        this.alpha -= 0.012;
-        this.lineWidth *= 0.98;
-      }
-      draw() {
-        ctx.save();
-        ctx.globalAlpha = Math.max(0, this.alpha);
-        ctx.strokeStyle = `hsl(${this.hue}, ${this.sat}%, ${this.light}%)`;
-        ctx.lineWidth = this.lineWidth;
-        ctx.shadowColor = `hsl(${this.hue}, 100%, 70%)`;
-        ctx.shadowBlur = 30 * devicePixelRatio;
-        ctx.beginPath();
-        ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.restore();
-      }
+    update() {
+      this.x += this.vx; this.y += this.vy;
+      this.vy += this.gravity;
+      this.alpha -= this.decay;
+      this.size  *= 0.985;
     }
-
-    // ── Background fade ──────────────────────────────────────────────────────
-    function fadeBackground() {
+    draw() {
       ctx.save();
-      ctx.globalAlpha = 0.08;
-      ctx.fillStyle = '#000000';
-      ctx.fillRect(0, 0, W, H);
+      ctx.globalAlpha = Math.max(0, this.alpha);
+      const g = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, this.size);
+      g.addColorStop(0, `hsl(${this.hue},${this.sat}%,${this.light}%)`);
+      g.addColorStop(1, `hsla(${this.hue},${this.sat}%,${this.light}%,0)`);
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+      ctx.fill();
       ctx.restore();
     }
+    get dead() { return this.alpha <= 0; }
+  }
 
-    // ── Main loop ────────────────────────────────────────────────────────────
-    function loop() {
-      fadeBackground();
-
-      // Update & draw blobs
-      for (let i = blobs.length - 1; i >= 0; i--) {
-        blobs[i].update();
-        blobs[i].draw();
-        if (blobs[i].alpha <= 0) blobs.splice(i, 1);
-      }
-
-      // Update & draw particles
-      for (let i = particles.length - 1; i >= 0; i--) {
-        particles[i].update();
-        particles[i].draw();
-        if (particles[i].alpha <= 0) particles.splice(i, 1);
-      }
-
-      animId = requestAnimationFrame(loop);
+  // Expanding ring (used with sparkle mode)
+  class Ring {
+    constructor(x, y, hue) {
+      this.x = x; this.y = y; this.hue = hue;
+      this.r = px(10);
+      this.maxR = px(Math.random() * 140 + 80);
+      this.alpha = 0.9;
+      this.lw = px(Math.random() * 8 + 4);
     }
-
-    loop();
-
-    // ── Touch helpers ────────────────────────────────────────────────────────
-    function scaleX(x) { return x * devicePixelRatio; }
-    function scaleY(y) { return y * devicePixelRatio; }
-
-    function getHue(id) {
-      if (!touchHues.has(id)) {
-        touchHues.set(id, Math.random() * 360);
-      }
-      return touchHues.get(id);
+    update() {
+      this.r += (this.maxR - this.r) * 0.08;
+      this.alpha -= 0.012;
+      this.lw *= 0.98;
     }
-
-    function shiftHue(id, amount = 3) {
-      const h = (getHue(id) + amount) % 360;
-      touchHues.set(id, h);
-      return h;
+    draw() {
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, this.alpha);
+      ctx.strokeStyle = `hsl(${this.hue},100%,60%)`;
+      ctx.lineWidth = this.lw;
+      ctx.shadowColor = `hsl(${this.hue},100%,70%)`;
+      ctx.shadowBlur = px(30);
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
     }
+    get dead() { return this.alpha <= 0; }
+  }
 
-    function spawnBurst(x, y, hue, count = 3) {
-      for (let i = 0; i < count; i++) {
-        particles.push(new Particle(scaleX(x), scaleY(y), (hue + Math.random() * 40 - 20 + 360) % 360));
-      }
-      blobs.push(new Blob(scaleX(x), scaleY(y), hue));
+  // Generic emoji item
+  class EmojiItem {
+    constructor(x, y, emoji, opts = {}) {
+      this.x = x; this.y = y;
+      this.emoji = emoji;
+      this.size = px(opts.size ?? (Math.random() * 18 + 28));
+      this.alpha = 1;
+      this.decay = opts.decay ?? (Math.random() * 0.012 + 0.006);
+      this.vx = (Math.random() - 0.5) * px(opts.spreadX ?? 3);
+      this.vy = opts.vy ?? ((Math.random() - 0.5) * px(3));
+      this.gravity  = px(opts.gravity  ?? 0.1);
+      this.spin = (Math.random() - 0.5) * (opts.spin ?? 0.08);
+      this.rotation = Math.random() * Math.PI * 2;
+      this.scaleF = 1;
+      this.scaleDecay = opts.scaleDecay ?? 0.993;
     }
-
-    function spawnTrail(x, y, hue) {
-      const count = Math.floor(Math.random() * 3) + 2;
-      for (let i = 0; i < count; i++) {
-        particles.push(new Particle(scaleX(x), scaleY(y), (hue + Math.random() * 30 - 15 + 360) % 360));
-      }
+    update() {
+      this.x += this.vx;
+      this.y += this.vy;
+      this.vy += this.gravity;
+      this.alpha -= this.decay;
+      this.rotation += this.spin;
+      this.scaleF *= this.scaleDecay;
     }
-
-    function hideHint() {
-      if (!hintHidden) {
-        hintHidden = true;
-        hint.style.opacity = '0';
-        setTimeout(() => hint.remove(), 1200);
-      }
+    draw() {
+      const s = this.size * this.scaleF;
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, this.alpha);
+      ctx.translate(this.x, this.y);
+      ctx.rotate(this.rotation);
+      ctx.font = `${s}px serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      // glow
+      ctx.shadowColor = 'rgba(255,255,255,0.6)';
+      ctx.shadowBlur = px(12);
+      ctx.fillText(this.emoji, 0, 0);
+      ctx.restore();
     }
+    get dead() { return this.alpha <= 0; }
+  }
 
-    // ── Touch events ─────────────────────────────────────────────────────────
-    canvas.addEventListener('touchstart', (e) => {
-      e.preventDefault();
-      hideHint();
-      for (const t of e.changedTouches) {
-        const hue = getHue(t.identifier);
-        spawnBurst(t.clientX, t.clientY, hue, 6);
+  // Star (drawn with canvas path for crisp look)
+  class Star {
+    constructor(x, y, hue) {
+      this.x = x; this.y = y; this.hue = hue;
+      this.r = px(Math.random() * 16 + 10);
+      this.alpha = 1;
+      this.decay = Math.random() * 0.014 + 0.006;
+      this.vx = (Math.random() - 0.5) * px(4);
+      this.vy = (Math.random() - 0.5) * px(3) - px(1);
+      this.gravity = px(0.09);
+      this.spin = (Math.random() - 0.5) * 0.12;
+      this.rotation = Math.random() * Math.PI * 2;
+    }
+    update() {
+      this.x += this.vx; this.y += this.vy;
+      this.vy += this.gravity;
+      this.alpha -= this.decay;
+      this.rotation += this.spin;
+    }
+    draw() {
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, this.alpha);
+      ctx.translate(this.x, this.y);
+      ctx.rotate(this.rotation);
+      ctx.shadowColor = `hsl(${this.hue},100%,70%)`;
+      ctx.shadowBlur = px(18);
+      ctx.fillStyle = `hsl(${this.hue},100%,65%)`;
+      ctx.beginPath();
+      for (let i = 0; i < 5; i++) {
+        const a = (i * 4 * Math.PI) / 5 - Math.PI / 2;
+        const b = a + (2 * Math.PI) / 10;
+        if (i === 0) ctx.moveTo(Math.cos(a) * this.r, Math.sin(a) * this.r);
+        else ctx.lineTo(Math.cos(a) * this.r, Math.sin(a) * this.r);
+        ctx.lineTo(Math.cos(b) * this.r * 0.42, Math.sin(b) * this.r * 0.42);
       }
-    }, { passive: false });
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
+    get dead() { return this.alpha <= 0; }
+  }
 
-    canvas.addEventListener('touchmove', (e) => {
-      e.preventDefault();
-      for (const t of e.changedTouches) {
-        const hue = shiftHue(t.identifier, 2);
-        spawnTrail(t.clientX, t.clientY, hue);
-      }
-    }, { passive: false });
+  // Heart (drawn with canvas path)
+  class Heart {
+    constructor(x, y, hue) {
+      this.x = x; this.y = y; this.hue = hue;
+      this.size = px(Math.random() * 14 + 10);
+      this.alpha = 1;
+      this.decay = Math.random() * 0.010 + 0.005;
+      this.vx = (Math.random() - 0.5) * px(3);
+      this.vy = -(Math.random() * px(2) + px(1)); // floats up
+      this.gravity = -px(0.03); // slight upward drift
+      this.wobble = 0;
+      this.wobbleSpeed = Math.random() * 0.08 + 0.04;
+    }
+    update() {
+      this.x += this.vx + Math.sin(this.wobble) * px(0.5);
+      this.y += this.vy;
+      this.vy += this.gravity;
+      this.wobble += this.wobbleSpeed;
+      this.alpha -= this.decay;
+    }
+    draw() {
+      const s = this.size;
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, this.alpha);
+      ctx.translate(this.x, this.y);
+      ctx.shadowColor = `hsl(${this.hue},100%,70%)`;
+      ctx.shadowBlur = px(16);
+      ctx.fillStyle = `hsl(${this.hue},100%,65%)`;
+      ctx.beginPath();
+      ctx.moveTo(0, s * 0.3);
+      ctx.bezierCurveTo( s * 0.9,  -s * 0.4,  s * 1.5,  s * 0.5,   0,  s * 1.3);
+      ctx.bezierCurveTo(-s * 1.5,  s * 0.5, -s * 0.9, -s * 0.4,    0,  s * 0.3);
+      ctx.fill();
+      ctx.restore();
+    }
+    get dead() { return this.alpha <= 0; }
+  }
 
-    canvas.addEventListener('touchend', (e) => {
-      e.preventDefault();
-      for (const t of e.changedTouches) {
-        touchHues.delete(t.identifier);
-      }
-    }, { passive: false });
+  // Bubble (hollow circle that floats up)
+  class Bubble {
+    constructor(x, y, hue) {
+      this.x = x; this.y = y; this.hue = hue;
+      this.r = px(Math.random() * 20 + 12);
+      this.targetR = this.r * (Math.random() * 1.5 + 1.5);
+      this.alpha = 0.85;
+      this.decay = Math.random() * 0.007 + 0.003;
+      this.vx = (Math.random() - 0.5) * px(1.5);
+      this.vy = -(Math.random() * px(2) + px(0.8));
+      this.wobble = Math.random() * Math.PI * 2;
+      this.wobbleSpeed = Math.random() * 0.05 + 0.02;
+    }
+    update() {
+      this.r += (this.targetR - this.r) * 0.04;
+      this.wobble += this.wobbleSpeed;
+      this.x += this.vx + Math.sin(this.wobble) * px(0.8);
+      this.y += this.vy;
+      this.alpha -= this.decay;
+    }
+    draw() {
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, this.alpha);
+      // shimmer highlight
+      const g = ctx.createRadialGradient(
+        this.x - this.r * 0.3, this.y - this.r * 0.3, this.r * 0.05,
+        this.x, this.y, this.r
+      );
+      g.addColorStop(0, 'rgba(255,255,255,0.55)');
+      g.addColorStop(0.4, `hsla(${this.hue},80%,80%,0.25)`);
+      g.addColorStop(1, `hsla(${this.hue},90%,65%,0.1)`);
+      ctx.strokeStyle = `hsla(${this.hue},90%,75%,0.8)`;
+      ctx.lineWidth = px(2.5);
+      ctx.shadowColor = `hsl(${this.hue},100%,75%)`;
+      ctx.shadowBlur = px(14);
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.fillStyle = g;
+      ctx.fill();
+      ctx.restore();
+    }
+    get dead() { return this.alpha <= 0; }
+  }
 
-    // Mouse support (for desktop testing)
-    let mouseDown = false;
-    let mouseHue = Math.random() * 360;
+  // ── Spawn functions ────────────────────────────────────────────────────────
+  function spawn(cx, cy, hue, burst = false) {
+    const x = cx * dpr, y = cy * dpr;
+    const count = burst ? 8 : (Math.floor(Math.random() * 2) + 2);
 
-    canvas.addEventListener('mousedown', (e) => {
-      mouseDown = true;
-      mouseHue = Math.random() * 360;
-      spawnBurst(e.clientX, e.clientY, mouseHue, 6);
-    });
+    switch (currentMode) {
+      case 'sparkle':
+        for (let i = 0; i < count; i++)
+          items.push(new Sparkle(x, y, (hue + Math.random() * 40 - 20 + 360) % 360));
+        if (burst) items.push(new Ring(x, y, hue));
+        break;
 
-    canvas.addEventListener('mousemove', (e) => {
-      if (!mouseDown) return;
-      mouseHue = (mouseHue + 2) % 360;
-      spawnTrail(e.clientX, e.clientY, mouseHue);
-    });
+      case 'star':
+        for (let i = 0; i < count; i++)
+          items.push(new Star(x, y, (hue + Math.random() * 60 - 30 + 360) % 360));
+        break;
 
-    canvas.addEventListener('mouseup', () => { mouseDown = false; });
+      case 'heart':
+        for (let i = 0; i < count; i++)
+          items.push(new Heart(x, y, (hue + Math.random() * 60 - 30 + 360) % 360));
+        break;
 
-    // Prevent context menu on long press
-    window.addEventListener('contextmenu', (e) => e.preventDefault());
-  </script>
+      case 'bubble':
+        for (let i = 0; i < (burst ? 5 : 2); i++)
+          items.push(new Bubble(x, y, (hue + Math.random() * 60 - 30 + 360) % 360));
+        break;
+
+      case 'balloon':
+        for (let i = 0; i < (burst ? 5 : 2); i++)
+          items.push(new EmojiItem(x, y, '🎈', {
+            vy: -(Math.random() * px(2) + px(1.5)),
+            gravity: -px(0.02),
+            spin: 0.03,
+            size: Math.random() * 20 + 28,
+            decay: 0.006,
+          }));
+        break;
+
+      case 'butterfly':
+        for (let i = 0; i < count; i++)
+          items.push(new EmojiItem(x, y, '🦋', {
+            vy: (Math.random() - 0.5) * px(3),
+            gravity: 0,
+            spreadX: 4,
+            spin: 0.05,
+            size: Math.random() * 16 + 24,
+            decay: 0.007,
+          }));
+        break;
+
+      case 'flower':
+        for (let i = 0; i < count; i++)
+          items.push(new EmojiItem(x, y, Math.random() < 0.5 ? '🌸' : '🌺', {
+            vy: (Math.random() - 0.5) * px(2) - px(0.5),
+            gravity: px(0.06),
+            spin: 0.1,
+            size: Math.random() * 16 + 24,
+            decay: 0.008,
+          }));
+        break;
+
+      case 'dino':
+        for (let i = 0; i < (burst ? 5 : 2); i++)
+          items.push(new EmojiItem(x, y, Math.random() < 0.5 ? '🦕' : '🦖', {
+            vy: -(Math.random() * px(4) + px(2)),
+            gravity: px(0.18),
+            spreadX: 5,
+            spin: 0.06,
+            size: Math.random() * 20 + 32,
+            decay: 0.009,
+          }));
+        break;
+    }
+  }
+
+  // ── Render loop ────────────────────────────────────────────────────────────
+  function loop() {
+    ctx.save();
+    ctx.globalAlpha = 0.08;
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, W, H);
+    ctx.restore();
+
+    for (let i = items.length - 1; i >= 0; i--) {
+      items[i].update();
+      items[i].draw();
+      if (items[i].dead) items.splice(i, 1);
+    }
+    requestAnimationFrame(loop);
+  }
+  loop();
+
+  // ── Touch events ───────────────────────────────────────────────────────────
+  const cw = document.getElementById('canvas-wrap');
+
+  cw.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    hideHint();
+    for (const t of e.changedTouches) {
+      const hue = getHue(t.identifier);
+      spawn(t.clientX, t.clientY, hue, true);
+    }
+  }, { passive: false });
+
+  cw.addEventListener('touchmove', (e) => {
+    e.preventDefault();
+    for (const t of e.changedTouches) {
+      const hue = shiftHue(t.identifier);
+      spawn(t.clientX, t.clientY, hue, false);
+    }
+  }, { passive: false });
+
+  cw.addEventListener('touchend', (e) => {
+    for (const t of e.changedTouches) touchHues.delete(t.identifier);
+  }, { passive: false });
+
+  // Mouse (desktop testing)
+  let mouseDown = false, mouseHue = 0;
+  cw.addEventListener('mousedown', (e) => {
+    mouseDown = true;
+    mouseHue = Math.random() * 360;
+    spawn(e.clientX, e.clientY, mouseHue, true);
+  });
+  cw.addEventListener('mousemove', (e) => {
+    if (!mouseDown) return;
+    mouseHue = (mouseHue + 2) % 360;
+    spawn(e.clientX, e.clientY, mouseHue, false);
+  });
+  cw.addEventListener('mouseup', () => { mouseDown = false; });
+
+  window.addEventListener('contextmenu', e => e.preventDefault());
+</script>
 </body>
 </html>
