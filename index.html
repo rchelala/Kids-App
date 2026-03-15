@@ -252,14 +252,31 @@
     get dead() { return this.alpha <= 0; }
   }
 
+  // Pre-render emoji to offscreen canvas once, reuse via drawImage (much faster)
+  const emojiCache = {};
+  function getEmojiImage(emoji) {
+    if (emojiCache[emoji]) return emojiCache[emoji];
+    const size = 128;
+    const oc = document.createElement('canvas');
+    oc.width = size; oc.height = size;
+    const octx = oc.getContext('2d');
+    octx.font = `${size * 0.8}px serif`;
+    octx.textAlign = 'center';
+    octx.textBaseline = 'middle';
+    octx.fillText(emoji, size / 2, size / 2);
+    emojiCache[emoji] = oc;
+    return oc;
+  }
+
   // Generic emoji item
   class EmojiItem {
     constructor(x, y, emoji, opts = {}) {
       this.x = x; this.y = y;
       this.emoji = emoji;
+      this.img = getEmojiImage(emoji); // cached — rendered only once
       this.size = px(opts.size ?? (Math.random() * 18 + 28));
       this.alpha = 1;
-      this.decay = opts.decay ?? (Math.random() * 0.012 + 0.006);
+      this.decay = opts.decay ?? (Math.random() * 0.018 + 0.010);
       this.vx = (Math.random() - 0.5) * px(opts.spreadX ?? 3);
       this.vy = opts.vy ?? ((Math.random() - 0.5) * px(3));
       this.gravity  = px(opts.gravity  ?? 0.1);
@@ -277,15 +294,12 @@
       this.scaleF *= this.scaleDecay;
     }
     draw() {
-      const s = Math.round(this.size * this.scaleF);
+      const s = this.size * this.scaleF;
       ctx.save();
       ctx.globalAlpha = Math.max(0, this.alpha);
       ctx.translate(this.x, this.y);
       ctx.rotate(this.rotation);
-      ctx.font = `${s}px serif`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(this.emoji, 0, 0);
+      ctx.drawImage(this.img, -s / 2, -s / 2, s, s);
       ctx.restore();
     }
     get dead() { return this.alpha <= 0; }
@@ -409,6 +423,9 @@
     }
     get dead() { return this.alpha <= 0; }
   }
+
+  // Pre-warm emoji cache so first touch has no hitch
+  ['🎈','🦋','🌸','🌺','🦕','🦖'].forEach(getEmojiImage);
 
   // ── Spawn functions ────────────────────────────────────────────────────────
   function spawn(cx, cy, hue, burst = false) {
