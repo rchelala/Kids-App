@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Touch & Play" />
+  <meta name="theme-color" content="#000000" />
+  <link rel="manifest" href="/manifest.json" />
+  <link rel="apple-touch-icon" href="/icons/icon.svg" />
+  <title>Touch & Play</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+      -webkit-touch-callout: none;
+      -webkit-user-select: none;
+      user-select: none;
+    }
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #000;
+      touch-action: none;
+    }
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      cursor: none;
+    }
+    #hint {
+      position: fixed;
+      bottom: 40px;
+      left: 50%;
+      transform: translateX(-50%);
+      color: rgba(255,255,255,0.35);
+      font-family: -apple-system, sans-serif;
+      font-size: 18px;
+      letter-spacing: 2px;
+      text-align: center;
+      pointer-events: none;
+      transition: opacity 1s;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="c"></canvas>
+  <div id="hint">touch anywhere ✨</div>
+
+  <script>
+    const canvas = document.getElementById('c');
+    const ctx = canvas.getContext('2d');
+    const hint = document.getElementById('hint');
+
+    let W, H;
+    let particles = [];
+    let blobs = [];
+    let touched = false;
+    let hintHidden = false;
+    let animId;
+
+    // Touch hue per touch identifier
+    const touchHues = new Map();
+
+    function resize() {
+      W = canvas.width = window.innerWidth * devicePixelRatio;
+      H = canvas.height = window.innerHeight * devicePixelRatio;
+      canvas.style.width = window.innerWidth + 'px';
+      canvas.style.height = window.innerHeight + 'px';
+    }
+
+    window.addEventListener('resize', resize);
+    resize();
+
+    // ── Particle (sparkle trail) ─────────────────────────────────────────────
+    class Particle {
+      constructor(x, y, hue) {
+        this.x = x;
+        this.y = y;
+        this.hue = hue;
+        this.size = (Math.random() * 18 + 8) * devicePixelRatio;
+        this.alpha = 1;
+        this.decay = Math.random() * 0.018 + 0.008;
+        this.vx = (Math.random() - 0.5) * 4 * devicePixelRatio;
+        this.vy = (Math.random() - 0.5) * 4 * devicePixelRatio;
+        this.gravity = 0.12 * devicePixelRatio;
+        this.sat = Math.random() * 30 + 70;  // 70-100%
+        this.light = Math.random() * 20 + 50; // 50-70%
+      }
+      update() {
+        this.x += this.vx;
+        this.y += this.vy;
+        this.vy += this.gravity;
+        this.alpha -= this.decay;
+        this.size *= 0.985;
+      }
+      draw() {
+        ctx.save();
+        ctx.globalAlpha = Math.max(0, this.alpha);
+        const grd = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, this.size);
+        grd.addColorStop(0, `hsl(${this.hue}, ${this.sat}%, ${this.light}%)`);
+        grd.addColorStop(1, `hsla(${this.hue}, ${this.sat}%, ${this.light}%, 0)`);
+        ctx.fillStyle = grd;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+    }
+
+    // ── Blob (expanding ring on tap) ────────────────────────────────────────
+    class Blob {
+      constructor(x, y, hue) {
+        this.x = x;
+        this.y = y;
+        this.hue = hue;
+        this.r = 10 * devicePixelRatio;
+        this.maxR = (Math.random() * 140 + 80) * devicePixelRatio;
+        this.alpha = 0.9;
+        this.lineWidth = (Math.random() * 8 + 4) * devicePixelRatio;
+        this.sat = 100;
+        this.light = 60;
+        this.growing = true;
+      }
+      update() {
+        if (this.growing) {
+          this.r += (this.maxR - this.r) * 0.08;
+          if (this.r > this.maxR * 0.95) this.growing = false;
+        }
+        this.alpha -= 0.012;
+        this.lineWidth *= 0.98;
+      }
+      draw() {
+        ctx.save();
+        ctx.globalAlpha = Math.max(0, this.alpha);
+        ctx.strokeStyle = `hsl(${this.hue}, ${this.sat}%, ${this.light}%)`;
+        ctx.lineWidth = this.lineWidth;
+        ctx.shadowColor = `hsl(${this.hue}, 100%, 70%)`;
+        ctx.shadowBlur = 30 * devicePixelRatio;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+      }
+    }
+
+    // ── Background fade ──────────────────────────────────────────────────────
+    function fadeBackground() {
+      ctx.save();
+      ctx.globalAlpha = 0.08;
+      ctx.fillStyle = '#000000';
+      ctx.fillRect(0, 0, W, H);
+      ctx.restore();
+    }
+
+    // ── Main loop ────────────────────────────────────────────────────────────
+    function loop() {
+      fadeBackground();
+
+      // Update & draw blobs
+      for (let i = blobs.length - 1; i >= 0; i--) {
+        blobs[i].update();
+        blobs[i].draw();
+        if (blobs[i].alpha <= 0) blobs.splice(i, 1);
+      }
+
+      // Update & draw particles
+      for (let i = particles.length - 1; i >= 0; i--) {
+        particles[i].update();
+        particles[i].draw();
+        if (particles[i].alpha <= 0) particles.splice(i, 1);
+      }
+
+      animId = requestAnimationFrame(loop);
+    }
+
+    loop();
+
+    // ── Touch helpers ────────────────────────────────────────────────────────
+    function scaleX(x) { return x * devicePixelRatio; }
+    function scaleY(y) { return y * devicePixelRatio; }
+
+    function getHue(id) {
+      if (!touchHues.has(id)) {
+        touchHues.set(id, Math.random() * 360);
+      }
+      return touchHues.get(id);
+    }
+
+    function shiftHue(id, amount = 3) {
+      const h = (getHue(id) + amount) % 360;
+      touchHues.set(id, h);
+      return h;
+    }
+
+    function spawnBurst(x, y, hue, count = 3) {
+      for (let i = 0; i < count; i++) {
+        particles.push(new Particle(scaleX(x), scaleY(y), (hue + Math.random() * 40 - 20 + 360) % 360));
+      }
+      blobs.push(new Blob(scaleX(x), scaleY(y), hue));
+    }
+
+    function spawnTrail(x, y, hue) {
+      const count = Math.floor(Math.random() * 3) + 2;
+      for (let i = 0; i < count; i++) {
+        particles.push(new Particle(scaleX(x), scaleY(y), (hue + Math.random() * 30 - 15 + 360) % 360));
+      }
+    }
+
+    function hideHint() {
+      if (!hintHidden) {
+        hintHidden = true;
+        hint.style.opacity = '0';
+        setTimeout(() => hint.remove(), 1200);
+      }
+    }
+
+    // ── Touch events ─────────────────────────────────────────────────────────
+    canvas.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      hideHint();
+      for (const t of e.changedTouches) {
+        const hue = getHue(t.identifier);
+        spawnBurst(t.clientX, t.clientY, hue, 6);
+      }
+    }, { passive: false });
+
+    canvas.addEventListener('touchmove', (e) => {
+      e.preventDefault();
+      for (const t of e.changedTouches) {
+        const hue = shiftHue(t.identifier, 2);
+        spawnTrail(t.clientX, t.clientY, hue);
+      }
+    }, { passive: false });
+
+    canvas.addEventListener('touchend', (e) => {
+      e.preventDefault();
+      for (const t of e.changedTouches) {
+        touchHues.delete(t.identifier);
+      }
+    }, { passive: false });
+
+    // Mouse support (for desktop testing)
+    let mouseDown = false;
+    let mouseHue = Math.random() * 360;
+
+    canvas.addEventListener('mousedown', (e) => {
+      mouseDown = true;
+      mouseHue = Math.random() * 360;
+      spawnBurst(e.clientX, e.clientY, mouseHue, 6);
+    });
+
+    canvas.addEventListener('mousemove', (e) => {
+      if (!mouseDown) return;
+      mouseHue = (mouseHue + 2) % 360;
+      spawnTrail(e.clientX, e.clientY, mouseHue);
+    });
+
+    canvas.addEventListener('mouseup', () => { mouseDown = false; });
+
+    // Prevent context menu on long press
+    window.addEventListener('contextmenu', (e) => e.preventDefault());
+  </script>
+</body>
+</html>

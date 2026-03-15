@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html>
+<head><title>Generate Icons</title></head>
+<body>
+<p>Right-click each canvas and "Save image as" → save to <code>icons/</code> folder.</p>
+<p><b>icon-192.png</b> (192×192):</p>
+<canvas id="c192" width="192" height="192"></canvas>
+<br><br>
+<p><b>icon-512.png</b> (512×512):</p>
+<canvas id="c512" width="512" height="512"></canvas>
+
+<script>
+function drawIcon(canvas) {
+  const size = canvas.width;
+  const ctx = canvas.getContext('2d');
+
+  // Black background
+  ctx.fillStyle = '#000';
+  ctx.fillRect(0, 0, size, size);
+
+  // Draw colorful circles
+  const circles = [
+    { x: 0.5, y: 0.5, r: 0.35, h: 270 }, // purple center
+    { x: 0.25, y: 0.3,  r: 0.2,  h: 10  }, // red
+    { x: 0.75, y: 0.3,  r: 0.18, h: 120 }, // green
+    { x: 0.25, y: 0.72, r: 0.18, h: 50  }, // yellow
+    { x: 0.75, y: 0.72, r: 0.2,  h: 200 }, // cyan
+  ];
+
+  for (const c of circles) {
+    const grd = ctx.createRadialGradient(
+      c.x * size, c.y * size, 0,
+      c.x * size, c.y * size, c.r * size
+    );
+    grd.addColorStop(0, `hsl(${c.h}, 100%, 75%)`);
+    grd.addColorStop(1, `hsla(${c.h}, 100%, 50%, 0)`);
+    ctx.globalAlpha = 0.85;
+    ctx.fillStyle = grd;
+    ctx.beginPath();
+    ctx.arc(c.x * size, c.y * size, c.r * size, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // White hand emoji-style dots
+  ctx.globalAlpha = 1;
+  const dots = [
+    { x: 0.5, y: 0.5 },
+    { x: 0.28, y: 0.28 },
+    { x: 0.72, y: 0.28 },
+  ];
+  for (const d of dots) {
+    ctx.fillStyle = 'rgba(255,255,255,0.9)';
+    ctx.beginPath();
+    ctx.arc(d.x * size, d.y * size, 0.05 * size, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+drawIcon(document.getElementById('c192'));
+drawIcon(document.getElementById('c512'));
+</script>
+</body>
+</html>
