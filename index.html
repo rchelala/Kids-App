@@ -145,10 +145,11 @@
   const canvas = document.getElementById('c');
   const ctx    = canvas.getContext('2d');
   const hint   = document.getElementById('hint');
-  const dpr    = devicePixelRatio || 1;
+  const dpr    = Math.min(devicePixelRatio || 1, 2); // cap dpr at 2 for perf
 
   let W, H;
   let items = [];          // all active visual items
+  const MAX_ITEMS = 250;   // hard cap to prevent slowdown
   let hintHidden = false;
   let currentMode = 'sparkle';
   const touchHues = new Map();
@@ -215,10 +216,7 @@
     draw() {
       ctx.save();
       ctx.globalAlpha = Math.max(0, this.alpha);
-      const g = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, this.size);
-      g.addColorStop(0, `hsl(${this.hue},${this.sat}%,${this.light}%)`);
-      g.addColorStop(1, `hsla(${this.hue},${this.sat}%,${this.light}%,0)`);
-      ctx.fillStyle = g;
+      ctx.fillStyle = `hsl(${this.hue},${this.sat}%,${this.light}%)`;
       ctx.beginPath();
       ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
       ctx.fill();
@@ -246,8 +244,6 @@
       ctx.globalAlpha = Math.max(0, this.alpha);
       ctx.strokeStyle = `hsl(${this.hue},100%,60%)`;
       ctx.lineWidth = this.lw;
-      ctx.shadowColor = `hsl(${this.hue},100%,70%)`;
-      ctx.shadowBlur = px(30);
       ctx.beginPath();
       ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2);
       ctx.stroke();
@@ -281,7 +277,7 @@
       this.scaleF *= this.scaleDecay;
     }
     draw() {
-      const s = this.size * this.scaleF;
+      const s = Math.round(this.size * this.scaleF);
       ctx.save();
       ctx.globalAlpha = Math.max(0, this.alpha);
       ctx.translate(this.x, this.y);
@@ -289,9 +285,6 @@
       ctx.font = `${s}px serif`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      // glow
-      ctx.shadowColor = 'rgba(255,255,255,0.6)';
-      ctx.shadowBlur = px(12);
       ctx.fillText(this.emoji, 0, 0);
       ctx.restore();
     }
@@ -322,8 +315,6 @@
       ctx.globalAlpha = Math.max(0, this.alpha);
       ctx.translate(this.x, this.y);
       ctx.rotate(this.rotation);
-      ctx.shadowColor = `hsl(${this.hue},100%,70%)`;
-      ctx.shadowBlur = px(18);
       ctx.fillStyle = `hsl(${this.hue},100%,65%)`;
       ctx.beginPath();
       for (let i = 0; i < 5; i++) {
@@ -365,8 +356,6 @@
       ctx.save();
       ctx.globalAlpha = Math.max(0, this.alpha);
       ctx.translate(this.x, this.y);
-      ctx.shadowColor = `hsl(${this.hue},100%,70%)`;
-      ctx.shadowBlur = px(16);
       ctx.fillStyle = `hsl(${this.hue},100%,65%)`;
       ctx.beginPath();
       ctx.moveTo(0, s * 0.3);
@@ -411,8 +400,6 @@
       g.addColorStop(1, `hsla(${this.hue},90%,65%,0.1)`);
       ctx.strokeStyle = `hsla(${this.hue},90%,75%,0.8)`;
       ctx.lineWidth = px(2.5);
-      ctx.shadowColor = `hsl(${this.hue},100%,75%)`;
-      ctx.shadowBlur = px(14);
       ctx.beginPath();
       ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2);
       ctx.stroke();
@@ -425,6 +412,7 @@
 
   // ── Spawn functions ────────────────────────────────────────────────────────
   function spawn(cx, cy, hue, burst = false) {
+    if (items.length >= MAX_ITEMS) return;
     const x = cx * dpr, y = cy * dpr;
     const count = burst ? 8 : (Math.floor(Math.random() * 2) + 2);
 
@@ -501,7 +489,7 @@
   // ── Render loop ────────────────────────────────────────────────────────────
   function loop() {
     ctx.save();
-    ctx.globalAlpha = 0.08;
+    ctx.globalAlpha = 0.12;
     ctx.fillStyle = '#000';
     ctx.fillRect(0, 0, W, H);
     ctx.restore();
