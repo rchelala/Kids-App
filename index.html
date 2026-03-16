@@ -31,15 +31,26 @@
       position: relative;
       overflow: hidden;
       touch-action: none;
-      background-size: cover;
-      background-position: center;
-      background-repeat: no-repeat;
+      background: #000;
+    }
+    #bg-img {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: center;
+      display: none;
+      z-index: 0;
     }
     canvas {
       display: block;
       width: 100%;
       height: 100%;
       cursor: none;
+      position: relative;
+      z-index: 1;
+      background: transparent;
     }
     #hint {
       position: absolute;
@@ -214,6 +225,7 @@
 <body>
 
 <div id="canvas-wrap">
+  <img id="bg-img" src="" alt="" />
   <canvas id="c"></canvas>
   <div id="hint">touch anywhere ✨</div>
 </div>
@@ -342,14 +354,18 @@
     setTimeout(() => galleryOverlay.classList.remove('open'), 250);
   });
 
+  const bgImg = document.getElementById('bg-img');
+
   function setBackground(src) {
     if (!src) {
       bgImageObj = null;
-      wrap.style.backgroundImage = '';
+      bgImg.style.display = 'none';
+      bgImg.src = '';
       galleryBtn.classList.remove('bg-active');
     } else {
-      bgImageObj = true; // flag: background is active
-      wrap.style.backgroundImage = `url('${src}')`;
+      bgImageObj = true;
+      bgImg.src = src;
+      bgImg.style.display = 'block';
       galleryBtn.classList.add('bg-active');
     }
   }
