@@ -31,6 +31,9 @@
       position: relative;
       overflow: hidden;
       touch-action: none;
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
     }
     canvas {
       display: block;
@@ -342,13 +345,13 @@
   function setBackground(src) {
     if (!src) {
       bgImageObj = null;
+      wrap.style.backgroundImage = '';
       galleryBtn.classList.remove('bg-active');
-      return;
+    } else {
+      bgImageObj = true; // flag: background is active
+      wrap.style.backgroundImage = `url('${src}')`;
+      galleryBtn.classList.add('bg-active');
     }
-    const img = new Image();
-    img.onload = () => { bgImageObj = img; };
-    img.src = src;
-    galleryBtn.classList.add('bg-active');
   }
 
   // ── Mode buttons ───────────────────────────────────────────────────────────
@@ -670,18 +673,8 @@
   // ── Render loop ────────────────────────────────────────────────────────────
   function drawBackground() {
     if (bgImageObj) {
-      // Draw background image scaled to cover canvas
-      const iw = bgImageObj.naturalWidth, ih = bgImageObj.naturalHeight;
-      const scale = Math.max(W / iw, H / ih);
-      const dx = (W - iw * scale) / 2;
-      const dy = (H - ih * scale) / 2;
-      ctx.drawImage(bgImageObj, dx, dy, iw * scale, ih * scale);
-      // Subtle trail overlay so old particles fade slightly
-      ctx.save();
-      ctx.globalAlpha = 0.18;
-      ctx.fillStyle = '#000';
-      ctx.fillRect(0, 0, W, H);
-      ctx.restore();
+      // CSS handles the background image — just clear the canvas each frame
+      ctx.clearRect(0, 0, W, H);
     } else {
       // No background — dark fade creates particle trails
       ctx.save();
