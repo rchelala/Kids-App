@@ -64,6 +64,7 @@
       white-space: nowrap;
       pointer-events: none;
       transition: opacity 1.2s;
+      z-index: 2;
     }
 
     /* ── Toolbar ─────────────────────────────────────────── */
@@ -71,7 +72,7 @@
       flex-shrink: 0;
       height: calc(84px + env(safe-area-inset-bottom));
       padding-bottom: env(safe-area-inset-bottom);
-      background: rgba(10, 10, 10, 0.95);
+      background: rgba(10,10,10,0.95);
       border-top: 1px solid rgba(255,255,255,0.08);
       display: flex;
       align-items: center;
@@ -85,11 +86,9 @@
       touch-action: pan-x;
     }
     #toolbar::-webkit-scrollbar { display: none; }
-
     .mode-btn {
       flex-shrink: 0;
-      width: 68px;
-      height: 68px;
+      width: 68px; height: 68px;
       border-radius: 16px;
       border: 2px solid rgba(255,255,255,0.1);
       background: rgba(255,255,255,0.05);
@@ -100,7 +99,6 @@
       gap: 2px;
       cursor: pointer;
       transition: transform 0.12s, border-color 0.2s, background 0.2s;
-      -webkit-tap-highlight-color: transparent;
       touch-action: manipulation;
     }
     .mode-btn .icon { font-size: 28px; line-height: 1; }
@@ -118,19 +116,11 @@
     }
     .mode-btn.active .label { color: rgba(255,255,255,0.9); }
     .mode-btn:active { transform: scale(0.93); }
-
-    /* Gallery button has a subtle teal tint */
     #gallery-btn { border-color: rgba(100,220,255,0.3); }
-    #gallery-btn.bg-active {
-      border-color: rgba(100,220,255,0.9);
-      background: rgba(100,220,255,0.18);
-    }
-
-    /* Divider between gallery button and mode buttons */
+    #gallery-btn.bg-active { border-color: rgba(100,220,255,0.9); background: rgba(100,220,255,0.18); }
     .toolbar-divider {
       flex-shrink: 0;
-      width: 1px;
-      height: 44px;
+      width: 1px; height: 44px;
       background: rgba(255,255,255,0.12);
       margin: 0 2px;
     }
@@ -146,7 +136,6 @@
       padding: env(safe-area-inset-top, 16px) 16px 16px;
     }
     #gallery-overlay.open { display: flex; }
-
     #gallery-header {
       display: flex;
       align-items: center;
@@ -156,23 +145,17 @@
     }
     #gallery-title {
       font-family: -apple-system, sans-serif;
-      font-size: 20px;
-      font-weight: 700;
-      color: #fff;
-      letter-spacing: 0.3px;
+      font-size: 20px; font-weight: 700;
+      color: #fff; letter-spacing: 0.3px;
     }
     #gallery-close {
-      width: 36px;
-      height: 36px;
+      width: 36px; height: 36px;
       border-radius: 50%;
       border: none;
       background: rgba(255,255,255,0.12);
-      color: #fff;
-      font-size: 18px;
+      color: #fff; font-size: 18px;
       cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+      display: flex; align-items: center; justify-content: center;
       touch-action: manipulation;
     }
     #gallery-grid {
@@ -192,33 +175,21 @@
       border: 3px solid transparent;
       transition: border-color 0.15s, transform 0.12s;
       touch-action: manipulation;
-      position: relative;
       background: rgba(255,255,255,0.06);
     }
     .gallery-item:active { transform: scale(0.93); }
     .gallery-item.selected { border-color: #fff; }
-    .gallery-item img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      display: block;
-    }
-    /* "No Background" tile */
+    .gallery-item img { width: 100%; height: 100%; object-fit: cover; display: block; }
     .gallery-none {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 6px;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 6px;
       background: rgba(255,255,255,0.07);
     }
     .gallery-none .none-icon { font-size: 30px; }
     .gallery-none .none-label {
       font-family: -apple-system, sans-serif;
-      font-size: 11px;
-      color: rgba(255,255,255,0.6);
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
+      font-size: 11px; color: rgba(255,255,255,0.6);
+      text-transform: uppercase; letter-spacing: 0.5px;
     }
   </style>
 </head>
@@ -230,7 +201,7 @@
   <div id="hint">touch anywhere ✨</div>
 </div>
 
-<!-- Gallery picker overlay -->
+<!-- Gallery picker -->
 <div id="gallery-overlay">
   <div id="gallery-header">
     <span id="gallery-title">🖼️ Choose a Background</span>
@@ -241,39 +212,27 @@
       <span class="none-icon">🌑</span>
       <span class="none-label">None</span>
     </div>
-    <!-- Image tiles injected by JS -->
   </div>
 </div>
 
 <div id="toolbar">
-  <button class="mode-btn" id="gallery-btn" title="Gallery">
+  <button class="mode-btn" id="gallery-btn">
     <span class="icon">🖼️</span><span class="label">Gallery</span>
   </button>
   <div class="toolbar-divider"></div>
-  <button class="mode-btn active" data-mode="sparkle">
-    <span class="icon">✨</span><span class="label">Sparkles</span>
-  </button>
-  <button class="mode-btn" data-mode="star">
-    <span class="icon">⭐</span><span class="label">Stars</span>
-  </button>
-  <button class="mode-btn" data-mode="heart">
-    <span class="icon">❤️</span><span class="label">Hearts</span>
-  </button>
-  <button class="mode-btn" data-mode="bubble">
-    <span class="icon">🫧</span><span class="label">Bubbles</span>
-  </button>
-  <button class="mode-btn" data-mode="balloon">
-    <span class="icon">🎈</span><span class="label">Balloons</span>
-  </button>
-  <button class="mode-btn" data-mode="butterfly">
-    <span class="icon">🦋</span><span class="label">Butterflies</span>
-  </button>
-  <button class="mode-btn" data-mode="flower">
-    <span class="icon">🌸</span><span class="label">Flowers</span>
-  </button>
-  <button class="mode-btn" data-mode="dino">
-    <span class="icon">🦕</span><span class="label">Dinos</span>
-  </button>
+  <button class="mode-btn active" data-mode="sparkle"><span class="icon">✨</span><span class="label">Sparkles</span></button>
+  <button class="mode-btn" data-mode="star"><span class="icon">⭐</span><span class="label">Stars</span></button>
+  <button class="mode-btn" data-mode="heart"><span class="icon">❤️</span><span class="label">Hearts</span></button>
+  <button class="mode-btn" data-mode="bubble"><span class="icon">🫧</span><span class="label">Bubbles</span></button>
+  <button class="mode-btn" data-mode="firework"><span class="icon">🎆</span><span class="label">Fireworks</span></button>
+  <button class="mode-btn" data-mode="snow"><span class="icon">❄️</span><span class="label">Snow</span></button>
+  <button class="mode-btn" data-mode="balloon"><span class="icon">🎈</span><span class="label">Balloons</span></button>
+  <button class="mode-btn" data-mode="butterfly"><span class="icon">🦋</span><span class="label">Butterflies</span></button>
+  <button class="mode-btn" data-mode="flower"><span class="icon">🌸</span><span class="label">Flowers</span></button>
+  <button class="mode-btn" data-mode="dino"><span class="icon">🦕</span><span class="label">Dinos</span></button>
+  <button class="mode-btn" data-mode="food"><span class="icon">🍕</span><span class="label">Food</span></button>
+  <button class="mode-btn" data-mode="vehicle"><span class="icon">🚗</span><span class="label">Vehicles</span></button>
+  <button class="mode-btn" data-mode="silly"><span class="icon">🤪</span><span class="label">Silly</span></button>
 </div>
 
 <script>
@@ -286,11 +245,12 @@
 
   let W, H;
   let items = [];
-  const MAX_ITEMS = 250;
+  const MAX_ITEMS = 300;
   let hintHidden = false;
   let currentMode = 'sparkle';
-  const touchHues = new Map();
-  let bgImageObj = null; // currently active background image
+  const touchHues  = new Map();
+  const touchCharges = new Map(); // hold-to-grow tracking
+  let bgImageObj = null;
 
   function resize() {
     const r = wrap.getBoundingClientRect();
@@ -300,8 +260,65 @@
   window.addEventListener('resize', resize);
   resize();
 
-  // ── Gallery images list ────────────────────────────────────────────────────
-  // Add filenames here to expand the gallery. Files go in the /Gallery/ folder.
+  // ── Audio ──────────────────────────────────────────────────────────────────
+  let audioCtx = null;
+  let lastSoundTime = 0;
+  const SOUND_GAP = 100; // ms between sounds
+
+  function ac() {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    return audioCtx;
+  }
+
+  function noise(ctx, dur, vol = 0.25) {
+    const buf = ctx.createBuffer(1, ctx.sampleRate * dur, ctx.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / d.length);
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    const g = ctx.createGain();
+    src.connect(g); g.connect(ctx.destination);
+    g.gain.setValueAtTime(vol, ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + dur);
+    src.start(); src.stop(ctx.currentTime + dur);
+  }
+
+  function tone(ctx, freq, dur, vol = 0.15, type = 'sine', freqEnd = null) {
+    const osc = ctx.createOscillator();
+    osc.type = type;
+    const g = ctx.createGain();
+    osc.connect(g); g.connect(ctx.destination);
+    osc.frequency.setValueAtTime(freq, ctx.currentTime);
+    if (freqEnd) osc.frequency.exponentialRampToValueAtTime(freqEnd, ctx.currentTime + dur);
+    g.gain.setValueAtTime(vol, ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + dur);
+    osc.start(); osc.stop(ctx.currentTime + dur);
+  }
+
+  const SOUNDS = {
+    sparkle:  a => tone(a, 1400 + Math.random()*600, 0.25, 0.12, 'sine', 300),
+    star:     a => tone(a, 1600, 0.2, 0.1, 'sine'),
+    heart:    a => tone(a, 480, 0.2, 0.13, 'sine'),
+    bubble:   a => noise(a, 0.08, 0.3),
+    firework: a => { tone(a, 140, 0.35, 0.25, 'sawtooth', 50); noise(a, 0.2, 0.15); },
+    snow:     a => noise(a, 0.3, 0.04),
+    balloon:  a => tone(a, 300, 0.22, 0.1, 'sawtooth', 700),
+    butterfly:a => { [0,0.06,0.12].forEach(t => { const o=a.createOscillator(),g=a.createGain(); o.connect(g);g.connect(a.destination); o.frequency.value=700+Math.random()*400; g.gain.setValueAtTime(0.07,a.currentTime+t); g.gain.exponentialRampToValueAtTime(0.001,a.currentTime+t+0.07); o.start(a.currentTime+t); o.stop(a.currentTime+t+0.08); }); },
+    flower:   a => tone(a, 880, 0.45, 0.09, 'sine'),
+    dino:     a => tone(a, 90,  0.4,  0.15, 'sawtooth', 55),
+    food:     a => tone(a, 380, 0.15, 0.13, 'triangle', 140),
+    vehicle:  a => tone(a, 90,  0.35, 0.1,  'sawtooth', 180),
+    silly:    a => tone(a, 550, 0.4,  0.15, 'sine', 90),
+  };
+
+  function playSound(mode) {
+    const now = Date.now();
+    if (now - lastSoundTime < SOUND_GAP) return;
+    lastSoundTime = now;
+    try { SOUNDS[mode]?.(ac()); } catch(e) {}
+  }
+
+  // ── Gallery ────────────────────────────────────────────────────────────────
   const GALLERY_FILES = [
     '2026-03-16 02_54_40-Documents and 1 more tab - File Explorer.png',
     '2026-03-16 02_55_20-Documents and 1 more tab - File Explorer.png',
@@ -319,42 +336,33 @@
     '2026-03-16 03_02_19-Documents and 1 more tab - File Explorer.png',
   ];
 
-  // Build gallery grid
-  const galleryGrid = document.getElementById('gallery-grid');
+  const galleryGrid    = document.getElementById('gallery-grid');
+  const galleryOverlay = document.getElementById('gallery-overlay');
+  const galleryBtn     = document.getElementById('gallery-btn');
+  const bgImg          = document.getElementById('bg-img');
+
   GALLERY_FILES.forEach(filename => {
-    const src = 'Gallery/' + encodeURIComponent(filename);
+    const src  = 'Gallery/' + encodeURIComponent(filename);
     const item = document.createElement('div');
     item.className = 'gallery-item';
     item.dataset.src = src;
     const img = document.createElement('img');
-    img.src = src;
-    img.loading = 'lazy';
+    img.src = src; img.loading = 'lazy';
     item.appendChild(img);
     galleryGrid.appendChild(item);
   });
 
-  // ── Gallery open/close/select ──────────────────────────────────────────────
-  const galleryOverlay = document.getElementById('gallery-overlay');
-  const galleryBtn     = document.getElementById('gallery-btn');
-
-  document.getElementById('gallery-btn').addEventListener('click', () => {
-    galleryOverlay.classList.add('open');
-  });
-  document.getElementById('gallery-close').addEventListener('click', () => {
-    galleryOverlay.classList.remove('open');
-  });
+  document.getElementById('gallery-btn').addEventListener('click', () => galleryOverlay.classList.add('open'));
+  document.getElementById('gallery-close').addEventListener('click', () => galleryOverlay.classList.remove('open'));
 
   galleryGrid.addEventListener('click', e => {
     const item = e.target.closest('.gallery-item');
     if (!item) return;
     galleryGrid.querySelectorAll('.gallery-item.selected').forEach(el => el.classList.remove('selected'));
     item.classList.add('selected');
-    const src = item.dataset.src;
-    setBackground(src);
+    setBackground(item.dataset.src);
     setTimeout(() => galleryOverlay.classList.remove('open'), 250);
   });
-
-  const bgImg = document.getElementById('bg-img');
 
   function setBackground(src) {
     if (!src) {
@@ -388,10 +396,8 @@
   }
   function shiftHue(id, amt = 2) {
     const h = (getHue(id) + amt) % 360;
-    touchHues.set(id, h);
-    return h;
+    touchHues.set(id, h); return h;
   }
-
   function hideHint() {
     if (!hintHidden) {
       hintHidden = true;
@@ -400,7 +406,7 @@
     }
   }
 
-  // ── Item classes ───────────────────────────────────────────────────────────
+  // ── Particle classes ───────────────────────────────────────────────────────
 
   class Sparkle {
     constructor(x, y, hue) {
@@ -411,22 +417,19 @@
       this.vx = (Math.random() - 0.5) * px(4);
       this.vy = (Math.random() - 0.5) * px(4);
       this.gravity = px(0.12);
-      this.sat   = Math.random() * 30 + 70;
+      this.sat = Math.random() * 30 + 70;
       this.light = Math.random() * 20 + 50;
     }
     update() {
       this.x += this.vx; this.y += this.vy;
       this.vy += this.gravity;
-      this.alpha -= this.decay;
-      this.size  *= 0.985;
+      this.alpha -= this.decay; this.size *= 0.985;
     }
     draw() {
       ctx.save();
       ctx.globalAlpha = Math.max(0, this.alpha);
       ctx.fillStyle = `hsl(${this.hue},${this.sat}%,${this.light}%)`;
-      ctx.beginPath();
-      ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.beginPath(); ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2); ctx.fill();
       ctx.restore();
     }
     get dead() { return this.alpha <= 0; }
@@ -435,30 +438,235 @@
   class Ring {
     constructor(x, y, hue) {
       this.x = x; this.y = y; this.hue = hue;
-      this.r = px(10);
-      this.maxR = px(Math.random() * 140 + 80);
-      this.alpha = 0.9;
-      this.lw = px(Math.random() * 8 + 4);
+      this.r = px(10); this.maxR = px(Math.random() * 140 + 80);
+      this.alpha = 0.9; this.lw = px(Math.random() * 8 + 4);
     }
     update() {
       this.r += (this.maxR - this.r) * 0.08;
-      this.alpha -= 0.012;
-      this.lw *= 0.98;
+      this.alpha -= 0.012; this.lw *= 0.98;
     }
     draw() {
       ctx.save();
       ctx.globalAlpha = Math.max(0, this.alpha);
       ctx.strokeStyle = `hsl(${this.hue},100%,60%)`;
       ctx.lineWidth = this.lw;
-      ctx.beginPath();
-      ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2);
-      ctx.stroke();
+      ctx.beginPath(); ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2); ctx.stroke();
       ctx.restore();
     }
     get dead() { return this.alpha <= 0; }
   }
 
-  // Pre-render emoji to offscreen canvas once — reuse via drawImage (GPU-accelerated)
+  class Star {
+    constructor(x, y, hue) {
+      this.x = x; this.y = y; this.hue = hue;
+      this.r = px(Math.random() * 16 + 10);
+      this.alpha = 1; this.decay = Math.random() * 0.014 + 0.006;
+      this.vx = (Math.random() - 0.5) * px(4);
+      this.vy = (Math.random() - 0.5) * px(3) - px(1);
+      this.gravity = px(0.09);
+      this.spin = (Math.random() - 0.5) * 0.12;
+      this.rotation = Math.random() * Math.PI * 2;
+    }
+    update() {
+      this.x += this.vx; this.y += this.vy;
+      this.vy += this.gravity; this.alpha -= this.decay; this.rotation += this.spin;
+    }
+    draw() {
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, this.alpha);
+      ctx.translate(this.x, this.y); ctx.rotate(this.rotation);
+      ctx.fillStyle = `hsl(${this.hue},100%,65%)`;
+      ctx.beginPath();
+      for (let i = 0; i < 5; i++) {
+        const a = (i * 4 * Math.PI) / 5 - Math.PI / 2;
+        const b = a + (2 * Math.PI) / 10;
+        if (i === 0) ctx.moveTo(Math.cos(a) * this.r, Math.sin(a) * this.r);
+        else ctx.lineTo(Math.cos(a) * this.r, Math.sin(a) * this.r);
+        ctx.lineTo(Math.cos(b) * this.r * 0.42, Math.sin(b) * this.r * 0.42);
+      }
+      ctx.closePath(); ctx.fill();
+      ctx.restore();
+    }
+    get dead() { return this.alpha <= 0; }
+  }
+
+  class Heart {
+    constructor(x, y, hue) {
+      this.x = x; this.y = y; this.hue = hue;
+      this.size = px(Math.random() * 14 + 10);
+      this.alpha = 1; this.decay = Math.random() * 0.010 + 0.005;
+      this.vx = (Math.random() - 0.5) * px(3);
+      this.vy = -(Math.random() * px(2) + px(1));
+      this.gravity = -px(0.03);
+      this.wobble = 0; this.wobbleSpeed = Math.random() * 0.08 + 0.04;
+    }
+    update() {
+      this.x += this.vx + Math.sin(this.wobble) * px(0.5);
+      this.y += this.vy; this.vy += this.gravity;
+      this.wobble += this.wobbleSpeed; this.alpha -= this.decay;
+    }
+    draw() {
+      const s = this.size;
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, this.alpha);
+      ctx.translate(this.x, this.y);
+      ctx.fillStyle = `hsl(${this.hue},100%,65%)`;
+      ctx.beginPath();
+      ctx.moveTo(0, s * 0.3);
+      ctx.bezierCurveTo( s * 0.9, -s * 0.4,  s * 1.5, s * 0.5,  0, s * 1.3);
+      ctx.bezierCurveTo(-s * 1.5,  s * 0.5, -s * 0.9, -s * 0.4, 0, s * 0.3);
+      ctx.fill(); ctx.restore();
+    }
+    get dead() { return this.alpha <= 0; }
+  }
+
+  class Bubble {
+    constructor(x, y, hue) {
+      this.x = x; this.y = y; this.hue = hue;
+      this.r = px(Math.random() * 20 + 12);
+      this.targetR = this.r * (Math.random() * 1.5 + 1.5);
+      this.alpha = 0.85; this.decay = Math.random() * 0.007 + 0.003;
+      this.vx = (Math.random() - 0.5) * px(1.5);
+      this.vy = -(Math.random() * px(2) + px(0.8));
+      this.wobble = Math.random() * Math.PI * 2;
+      this.wobbleSpeed = Math.random() * 0.05 + 0.02;
+    }
+    update() {
+      this.r += (this.targetR - this.r) * 0.04;
+      this.wobble += this.wobbleSpeed;
+      this.x += this.vx + Math.sin(this.wobble) * px(0.8);
+      this.y += this.vy; this.alpha -= this.decay;
+    }
+    draw() {
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, this.alpha);
+      ctx.strokeStyle = `hsla(${this.hue},90%,75%,0.8)`;
+      ctx.lineWidth = px(2.5);
+      ctx.beginPath(); ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2); ctx.stroke();
+      ctx.restore();
+    }
+    get dead() { return this.alpha <= 0; }
+  }
+
+  // Snowflake — simple white circle, falls downward
+  class Snowflake {
+    constructor(x, y) {
+      this.x = x + (Math.random() - 0.5) * px(60);
+      this.y = y;
+      this.r = px(Math.random() * 5 + 2);
+      this.alpha = Math.random() * 0.4 + 0.6;
+      this.decay = Math.random() * 0.004 + 0.002;
+      this.vx = (Math.random() - 0.5) * px(1);
+      this.vy = Math.random() * px(2) + px(0.5);
+      this.wobble = Math.random() * Math.PI * 2;
+      this.wobbleSpeed = Math.random() * 0.04 + 0.02;
+    }
+    update() {
+      this.wobble += this.wobbleSpeed;
+      this.x += this.vx + Math.sin(this.wobble) * px(0.5);
+      this.y += this.vy; this.alpha -= this.decay;
+    }
+    draw() {
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, this.alpha);
+      ctx.fillStyle = '#ddf';
+      ctx.beginPath(); ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    }
+    get dead() { return this.alpha <= 0 || this.y > H + px(20); }
+  }
+
+  // Firework rocket — flies up then explodes
+  class Rocket {
+    constructor(x, y, hue) {
+      this.x = x; this.y = y; this.hue = hue;
+      this.vx = (Math.random() - 0.5) * px(3);
+      this.vy = -(Math.random() * px(10) + px(6));
+      this.gravity = px(0.3);
+      this.alpha = 1;
+      this.fuse = Math.floor(Math.random() * 12 + 10); // frames before boom
+      this.age = 0;
+      this.exploded = false;
+    }
+    update() {
+      this.age++;
+      this.x += this.vx; this.y += this.vy;
+      this.vy += this.gravity;
+      if (this.age >= this.fuse && !this.exploded) {
+        this.exploded = true;
+        const count = 22;
+        for (let i = 0; i < count; i++) {
+          const angle = (i / count) * Math.PI * 2;
+          const speed = px(Math.random() * 6 + 2);
+          items.push(new FireworkSpark(this.x, this.y,
+            (this.hue + Math.random() * 60 - 30 + 360) % 360,
+            Math.cos(angle) * speed, Math.sin(angle) * speed));
+        }
+        items.push(new Ring(this.x, this.y, this.hue));
+      }
+    }
+    draw() {
+      if (this.exploded) return;
+      ctx.save();
+      ctx.globalAlpha = 0.9;
+      ctx.fillStyle = `hsl(${this.hue},100%,70%)`;
+      ctx.beginPath(); ctx.arc(this.x, this.y, px(4), 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    }
+    get dead() { return this.exploded; }
+  }
+
+  class FireworkSpark {
+    constructor(x, y, hue, vx, vy) {
+      this.x = x; this.y = y; this.hue = hue;
+      this.vx = vx; this.vy = vy;
+      this.alpha = 1; this.decay = Math.random() * 0.016 + 0.010;
+      this.size = px(Math.random() * 4 + 2);
+      this.gravity = px(0.14);
+    }
+    update() {
+      this.x += this.vx; this.y += this.vy;
+      this.vy += this.gravity;
+      this.vx *= 0.97; this.alpha -= this.decay; this.size *= 0.97;
+    }
+    draw() {
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, this.alpha);
+      ctx.fillStyle = `hsl(${this.hue},100%,65%)`;
+      ctx.beginPath(); ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    }
+    get dead() { return this.alpha <= 0; }
+  }
+
+  // Charge ring — visual feedback while holding
+  class ChargeRing {
+    constructor(x, y, hue, touchId) {
+      this.cx = x; this.cy = y; this.hue = hue; this.touchId = touchId;
+      this.alpha = 0;
+    }
+    update() {
+      const info = touchCharges.get(this.touchId);
+      if (!info) { this.alpha = 0; return; }
+      this.cx = info.x * dpr; this.cy = info.y * dpr;
+      this.charge = Math.min((Date.now() - info.startTime) / 1000, 1);
+      this.alpha = this.charge > 0.15 ? this.charge * 0.6 : 0;
+      this.hue = (this.hue + 3) % 360;
+    }
+    draw() {
+      if (this.alpha <= 0) return;
+      const r = px(18 + this.charge * 55);
+      ctx.save();
+      ctx.globalAlpha = this.alpha;
+      ctx.strokeStyle = `hsl(${this.hue},100%,70%)`;
+      ctx.lineWidth = px(3);
+      ctx.beginPath(); ctx.arc(this.cx, this.cy, r, 0, Math.PI * 2); ctx.stroke();
+      ctx.restore();
+    }
+    get dead() { return !touchCharges.has(this.touchId); }
+  }
+
+  // Emoji item — uses pre-rendered offscreen canvas (GPU fast)
   const emojiCache = {};
   function getEmojiImage(emoji) {
     if (emojiCache[emoji]) return emojiCache[emoji];
@@ -467,8 +675,7 @@
     oc.width = size; oc.height = size;
     const octx = oc.getContext('2d');
     octx.font = `${size * 0.8}px serif`;
-    octx.textAlign = 'center';
-    octx.textBaseline = 'middle';
+    octx.textAlign = 'center'; octx.textBaseline = 'middle';
     octx.fillText(emoji, size / 2, size / 2);
     emojiCache[emoji] = oc;
     return oc;
@@ -483,155 +690,41 @@
       this.decay = opts.decay ?? (Math.random() * 0.018 + 0.010);
       this.vx = (Math.random() - 0.5) * px(opts.spreadX ?? 3);
       this.vy = opts.vy ?? ((Math.random() - 0.5) * px(3));
-      this.gravity  = px(opts.gravity  ?? 0.1);
+      this.gravity = px(opts.gravity ?? 0.1);
       this.spin = (Math.random() - 0.5) * (opts.spin ?? 0.08);
       this.rotation = Math.random() * Math.PI * 2;
-      this.scaleF = 1;
-      this.scaleDecay = opts.scaleDecay ?? 0.993;
+      this.scaleF = 1; this.scaleDecay = opts.scaleDecay ?? 0.993;
     }
     update() {
-      this.x += this.vx;
-      this.y += this.vy;
-      this.vy += this.gravity;
-      this.alpha -= this.decay;
-      this.rotation += this.spin;
-      this.scaleF *= this.scaleDecay;
+      this.x += this.vx; this.y += this.vy;
+      this.vy += this.gravity; this.alpha -= this.decay;
+      this.rotation += this.spin; this.scaleF *= this.scaleDecay;
     }
     draw() {
       const s = this.size * this.scaleF;
       ctx.save();
       ctx.globalAlpha = Math.max(0, this.alpha);
-      ctx.translate(this.x, this.y);
-      ctx.rotate(this.rotation);
+      ctx.translate(this.x, this.y); ctx.rotate(this.rotation);
       ctx.drawImage(this.img, -s / 2, -s / 2, s, s);
       ctx.restore();
     }
     get dead() { return this.alpha <= 0; }
   }
 
-  class Star {
-    constructor(x, y, hue) {
-      this.x = x; this.y = y; this.hue = hue;
-      this.r = px(Math.random() * 16 + 10);
-      this.alpha = 1;
-      this.decay = Math.random() * 0.014 + 0.006;
-      this.vx = (Math.random() - 0.5) * px(4);
-      this.vy = (Math.random() - 0.5) * px(3) - px(1);
-      this.gravity = px(0.09);
-      this.spin = (Math.random() - 0.5) * 0.12;
-      this.rotation = Math.random() * Math.PI * 2;
-    }
-    update() {
-      this.x += this.vx; this.y += this.vy;
-      this.vy += this.gravity;
-      this.alpha -= this.decay;
-      this.rotation += this.spin;
-    }
-    draw() {
-      ctx.save();
-      ctx.globalAlpha = Math.max(0, this.alpha);
-      ctx.translate(this.x, this.y);
-      ctx.rotate(this.rotation);
-      ctx.fillStyle = `hsl(${this.hue},100%,65%)`;
-      ctx.beginPath();
-      for (let i = 0; i < 5; i++) {
-        const a = (i * 4 * Math.PI) / 5 - Math.PI / 2;
-        const b = a + (2 * Math.PI) / 10;
-        if (i === 0) ctx.moveTo(Math.cos(a) * this.r, Math.sin(a) * this.r);
-        else ctx.lineTo(Math.cos(a) * this.r, Math.sin(a) * this.r);
-        ctx.lineTo(Math.cos(b) * this.r * 0.42, Math.sin(b) * this.r * 0.42);
-      }
-      ctx.closePath();
-      ctx.fill();
-      ctx.restore();
-    }
-    get dead() { return this.alpha <= 0; }
-  }
+  // Pre-warm emoji cache
+  ['🎈','🦋','🌸','🌺','🦕','🦖',
+   '🍕','🍦','🎂','🍉','🍩','🍪','🍫','🍓',
+   '🚗','🚀','✈️','🚂','🚁','🏎️','🛸',
+   '😂','🤪','😜','🥳','😝','🤡','👻','🤩'].forEach(getEmojiImage);
 
-  class Heart {
-    constructor(x, y, hue) {
-      this.x = x; this.y = y; this.hue = hue;
-      this.size = px(Math.random() * 14 + 10);
-      this.alpha = 1;
-      this.decay = Math.random() * 0.010 + 0.005;
-      this.vx = (Math.random() - 0.5) * px(3);
-      this.vy = -(Math.random() * px(2) + px(1));
-      this.gravity = -px(0.03);
-      this.wobble = 0;
-      this.wobbleSpeed = Math.random() * 0.08 + 0.04;
-    }
-    update() {
-      this.x += this.vx + Math.sin(this.wobble) * px(0.5);
-      this.y += this.vy;
-      this.vy += this.gravity;
-      this.wobble += this.wobbleSpeed;
-      this.alpha -= this.decay;
-    }
-    draw() {
-      const s = this.size;
-      ctx.save();
-      ctx.globalAlpha = Math.max(0, this.alpha);
-      ctx.translate(this.x, this.y);
-      ctx.fillStyle = `hsl(${this.hue},100%,65%)`;
-      ctx.beginPath();
-      ctx.moveTo(0, s * 0.3);
-      ctx.bezierCurveTo( s * 0.9,  -s * 0.4,  s * 1.5,  s * 0.5,   0,  s * 1.3);
-      ctx.bezierCurveTo(-s * 1.5,  s * 0.5, -s * 0.9, -s * 0.4,    0,  s * 0.3);
-      ctx.fill();
-      ctx.restore();
-    }
-    get dead() { return this.alpha <= 0; }
-  }
+  const FOOD     = ['🍕','🍦','🎂','🍉','🍩','🍪','🍫','🍓'];
+  const VEHICLES = ['🚗','🚀','✈️','🚂','🚁','🏎️','🛸'];
+  const SILLY    = ['😂','🤪','😜','🥳','😝','🤡','👻','🤩'];
 
-  class Bubble {
-    constructor(x, y, hue) {
-      this.x = x; this.y = y; this.hue = hue;
-      this.r = px(Math.random() * 20 + 12);
-      this.targetR = this.r * (Math.random() * 1.5 + 1.5);
-      this.alpha = 0.85;
-      this.decay = Math.random() * 0.007 + 0.003;
-      this.vx = (Math.random() - 0.5) * px(1.5);
-      this.vy = -(Math.random() * px(2) + px(0.8));
-      this.wobble = Math.random() * Math.PI * 2;
-      this.wobbleSpeed = Math.random() * 0.05 + 0.02;
-    }
-    update() {
-      this.r += (this.targetR - this.r) * 0.04;
-      this.wobble += this.wobbleSpeed;
-      this.x += this.vx + Math.sin(this.wobble) * px(0.8);
-      this.y += this.vy;
-      this.alpha -= this.decay;
-    }
-    draw() {
-      ctx.save();
-      ctx.globalAlpha = Math.max(0, this.alpha);
-      const g = ctx.createRadialGradient(
-        this.x - this.r * 0.3, this.y - this.r * 0.3, this.r * 0.05,
-        this.x, this.y, this.r
-      );
-      g.addColorStop(0, 'rgba(255,255,255,0.55)');
-      g.addColorStop(0.4, `hsla(${this.hue},80%,80%,0.25)`);
-      g.addColorStop(1, `hsla(${this.hue},90%,65%,0.1)`);
-      ctx.strokeStyle = `hsla(${this.hue},90%,75%,0.8)`;
-      ctx.lineWidth = px(2.5);
-      ctx.beginPath();
-      ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.fillStyle = g;
-      ctx.fill();
-      ctx.restore();
-    }
-    get dead() { return this.alpha <= 0; }
-  }
-
-  // Pre-warm emoji cache so first touch has no hitch
-  ['🎈','🦋','🌸','🌺','🦕','🦖'].forEach(getEmojiImage);
-
-  // ── Spawn functions ────────────────────────────────────────────────────────
-  function spawn(cx, cy, hue, burst = false) {
+  // ── Spawn ──────────────────────────────────────────────────────────────────
+  function spawnParticles(cx, cy, hue, count, burst) {
     if (items.length >= MAX_ITEMS) return;
     const x = cx * dpr, y = cy * dpr;
-    const count = burst ? 8 : (Math.floor(Math.random() * 2) + 2);
 
     switch (currentMode) {
       case 'sparkle':
@@ -639,70 +732,107 @@
           items.push(new Sparkle(x, y, (hue + Math.random() * 40 - 20 + 360) % 360));
         if (burst) items.push(new Ring(x, y, hue));
         break;
+
       case 'star':
         for (let i = 0; i < count; i++)
           items.push(new Star(x, y, (hue + Math.random() * 60 - 30 + 360) % 360));
         break;
+
       case 'heart':
         for (let i = 0; i < count; i++)
           items.push(new Heart(x, y, (hue + Math.random() * 60 - 30 + 360) % 360));
         break;
+
       case 'bubble':
-        for (let i = 0; i < (burst ? 5 : 2); i++)
+        for (let i = 0; i < Math.ceil(count * 0.6); i++)
           items.push(new Bubble(x, y, (hue + Math.random() * 60 - 30 + 360) % 360));
         break;
+
+      case 'firework':
+        for (let i = 0; i < (burst ? 3 : 1); i++)
+          items.push(new Rocket(x, y, (hue + Math.random() * 60 - 30 + 360) % 360));
+        break;
+
+      case 'snow':
+        for (let i = 0; i < count * 2; i++)
+          items.push(new Snowflake(x, y));
+        break;
+
       case 'balloon':
-        for (let i = 0; i < (burst ? 5 : 2); i++)
+        for (let i = 0; i < Math.ceil(count * 0.6); i++)
           items.push(new EmojiItem(x, y, '🎈', {
-            vy: -(Math.random() * px(2) + px(1.5)),
-            gravity: -px(0.02), spin: 0.03,
-            size: Math.random() * 20 + 28, decay: 0.006,
+            vy: -(Math.random() * px(2) + px(1.5)), gravity: -px(0.02),
+            spin: 0.03, size: Math.random() * 20 + 28, decay: 0.006,
           }));
         break;
+
       case 'butterfly':
         for (let i = 0; i < count; i++)
           items.push(new EmojiItem(x, y, '🦋', {
-            vy: (Math.random() - 0.5) * px(3),
-            gravity: 0, spreadX: 4, spin: 0.05,
-            size: Math.random() * 16 + 24, decay: 0.007,
+            vy: (Math.random() - 0.5) * px(3), gravity: 0,
+            spreadX: 4, spin: 0.05, size: Math.random() * 16 + 24, decay: 0.007,
           }));
         break;
+
       case 'flower':
         for (let i = 0; i < count; i++)
           items.push(new EmojiItem(x, y, Math.random() < 0.5 ? '🌸' : '🌺', {
-            vy: (Math.random() - 0.5) * px(2) - px(0.5),
-            gravity: px(0.06), spin: 0.1,
-            size: Math.random() * 16 + 24, decay: 0.008,
+            vy: (Math.random() - 0.5) * px(2) - px(0.5), gravity: px(0.06),
+            spin: 0.1, size: Math.random() * 16 + 24, decay: 0.008,
           }));
         break;
+
       case 'dino':
-        for (let i = 0; i < (burst ? 5 : 2); i++)
+        for (let i = 0; i < Math.ceil(count * 0.6); i++)
           items.push(new EmojiItem(x, y, Math.random() < 0.5 ? '🦕' : '🦖', {
-            vy: -(Math.random() * px(4) + px(2)),
-            gravity: px(0.18), spreadX: 5, spin: 0.06,
-            size: Math.random() * 20 + 32, decay: 0.009,
+            vy: -(Math.random() * px(4) + px(2)), gravity: px(0.18),
+            spreadX: 5, spin: 0.06, size: Math.random() * 20 + 32, decay: 0.009,
+          }));
+        break;
+
+      case 'food':
+        for (let i = 0; i < count; i++)
+          items.push(new EmojiItem(x, y, FOOD[Math.floor(Math.random() * FOOD.length)], {
+            vy: -(Math.random() * px(4) + px(1)), gravity: px(0.12),
+            spreadX: 4, spin: 0.07, size: Math.random() * 18 + 28, decay: 0.009,
+          }));
+        break;
+
+      case 'vehicle':
+        for (let i = 0; i < Math.ceil(count * 0.6); i++)
+          items.push(new EmojiItem(x, y, VEHICLES[Math.floor(Math.random() * VEHICLES.length)], {
+            vx: (Math.random() - 0.5) * px(8),
+            vy: -(Math.random() * px(5) + px(2)), gravity: px(0.1),
+            spin: 0.04, size: Math.random() * 20 + 30, decay: 0.008,
+          }));
+        break;
+
+      case 'silly':
+        for (let i = 0; i < count; i++)
+          items.push(new EmojiItem(x, y, SILLY[Math.floor(Math.random() * SILLY.length)], {
+            vy: -(Math.random() * px(5) + px(2)), gravity: px(0.08),
+            spreadX: 5, spin: 0.12, size: Math.random() * 20 + 30, decay: 0.007,
           }));
         break;
     }
   }
 
+  function spawn(cx, cy, hue, burst) {
+    const count = burst ? 8 : (Math.floor(Math.random() * 2) + 2);
+    spawnParticles(cx, cy, hue, count, burst);
+  }
+
   // ── Render loop ────────────────────────────────────────────────────────────
-  function drawBackground() {
+  function loop() {
     if (bgImageObj) {
-      // CSS handles the background image — just clear the canvas each frame
       ctx.clearRect(0, 0, W, H);
     } else {
-      // No background — dark fade creates particle trails
       ctx.save();
       ctx.globalAlpha = 0.12;
       ctx.fillStyle = '#000';
       ctx.fillRect(0, 0, W, H);
       ctx.restore();
     }
-  }
-
-  function loop() {
-    drawBackground();
     for (let i = items.length - 1; i >= 0; i--) {
       items[i].update();
       items[i].draw();
@@ -715,37 +845,75 @@
   // ── Touch events ───────────────────────────────────────────────────────────
   const cw = document.getElementById('canvas-wrap');
 
-  cw.addEventListener('touchstart', (e) => {
+  cw.addEventListener('touchstart', e => {
     e.preventDefault();
     hideHint();
     for (const t of e.changedTouches) {
-      spawn(t.clientX, t.clientY, getHue(t.identifier), true);
+      const hue = getHue(t.identifier);
+      // Record charge start
+      touchCharges.set(t.identifier, { x: t.clientX, y: t.clientY, startTime: Date.now() });
+      items.push(new ChargeRing(t.clientX, t.clientY, hue, t.identifier));
+      spawn(t.clientX, t.clientY, hue, true);
+      playSound(currentMode);
     }
   }, { passive: false });
 
-  cw.addEventListener('touchmove', (e) => {
+  cw.addEventListener('touchmove', e => {
     e.preventDefault();
     for (const t of e.changedTouches) {
+      const info = touchCharges.get(t.identifier);
+      if (info) { info.x = t.clientX; info.y = t.clientY; }
       spawn(t.clientX, t.clientY, shiftHue(t.identifier), false);
     }
   }, { passive: false });
 
-  cw.addEventListener('touchend', (e) => {
-    for (const t of e.changedTouches) touchHues.delete(t.identifier);
+  cw.addEventListener('touchend', e => {
+    for (const t of e.changedTouches) {
+      const info = touchCharges.get(t.identifier);
+      if (info) {
+        const held = Date.now() - info.startTime;
+        if (held > 400) {
+          // Charged release — big burst
+          const charge = Math.min(held / 1000, 3);
+          const bonus = Math.floor(charge * 14);
+          spawnParticles(info.x, info.y, getHue(t.identifier), bonus, true);
+          playSound(currentMode);
+        }
+        touchCharges.delete(t.identifier);
+      }
+      touchHues.delete(t.identifier);
+    }
   }, { passive: false });
 
-  // Mouse (desktop testing)
+  // Mouse (desktop)
   let mouseDown = false, mouseHue = 0;
-  cw.addEventListener('mousedown', (e) => {
+  cw.addEventListener('mousedown', e => {
     mouseDown = true; mouseHue = Math.random() * 360;
+    touchCharges.set('mouse', { x: e.clientX, y: e.clientY, startTime: Date.now() });
+    items.push(new ChargeRing(e.clientX, e.clientY, mouseHue, 'mouse'));
     spawn(e.clientX, e.clientY, mouseHue, true);
+    playSound(currentMode);
   });
-  cw.addEventListener('mousemove', (e) => {
+  cw.addEventListener('mousemove', e => {
     if (!mouseDown) return;
+    const info = touchCharges.get('mouse');
+    if (info) { info.x = e.clientX; info.y = e.clientY; }
     mouseHue = (mouseHue + 2) % 360;
     spawn(e.clientX, e.clientY, mouseHue, false);
   });
-  cw.addEventListener('mouseup', () => { mouseDown = false; });
+  cw.addEventListener('mouseup', e => {
+    const info = touchCharges.get('mouse');
+    if (info) {
+      const held = Date.now() - info.startTime;
+      if (held > 400) {
+        const charge = Math.min(held / 1000, 3);
+        spawnParticles(info.x, info.y, mouseHue, Math.floor(charge * 14), true);
+        playSound(currentMode);
+      }
+      touchCharges.delete('mouse');
+    }
+    mouseDown = false;
+  });
 
   window.addEventListener('contextmenu', e => e.preventDefault());
 </script>
