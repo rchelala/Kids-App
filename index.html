@@ -51,6 +51,7 @@
       pointer-events: none;
       transition: opacity 1.2s;
     }
+
     /* ── Toolbar ─────────────────────────────────────────── */
     #toolbar {
       flex-shrink: 0;
@@ -103,6 +104,108 @@
     }
     .mode-btn.active .label { color: rgba(255,255,255,0.9); }
     .mode-btn:active { transform: scale(0.93); }
+
+    /* Gallery button has a subtle teal tint */
+    #gallery-btn { border-color: rgba(100,220,255,0.3); }
+    #gallery-btn.bg-active {
+      border-color: rgba(100,220,255,0.9);
+      background: rgba(100,220,255,0.18);
+    }
+
+    /* Divider between gallery button and mode buttons */
+    .toolbar-divider {
+      flex-shrink: 0;
+      width: 1px;
+      height: 44px;
+      background: rgba(255,255,255,0.12);
+      margin: 0 2px;
+    }
+
+    /* ── Gallery overlay ─────────────────────────────────── */
+    #gallery-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 200;
+      background: rgba(0,0,0,0.97);
+      flex-direction: column;
+      padding: env(safe-area-inset-top, 16px) 16px 16px;
+    }
+    #gallery-overlay.open { display: flex; }
+
+    #gallery-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-bottom: 14px;
+      flex-shrink: 0;
+    }
+    #gallery-title {
+      font-family: -apple-system, sans-serif;
+      font-size: 20px;
+      font-weight: 700;
+      color: #fff;
+      letter-spacing: 0.3px;
+    }
+    #gallery-close {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      border: none;
+      background: rgba(255,255,255,0.12);
+      color: #fff;
+      font-size: 18px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      touch-action: manipulation;
+    }
+    #gallery-grid {
+      flex: 1;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      padding-bottom: env(safe-area-inset-bottom, 8px);
+    }
+    .gallery-item {
+      aspect-ratio: 1;
+      border-radius: 14px;
+      overflow: hidden;
+      cursor: pointer;
+      border: 3px solid transparent;
+      transition: border-color 0.15s, transform 0.12s;
+      touch-action: manipulation;
+      position: relative;
+      background: rgba(255,255,255,0.06);
+    }
+    .gallery-item:active { transform: scale(0.93); }
+    .gallery-item.selected { border-color: #fff; }
+    .gallery-item img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    /* "No Background" tile */
+    .gallery-none {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      background: rgba(255,255,255,0.07);
+    }
+    .gallery-none .none-icon { font-size: 30px; }
+    .gallery-none .none-label {
+      font-family: -apple-system, sans-serif;
+      font-size: 11px;
+      color: rgba(255,255,255,0.6);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
   </style>
 </head>
 <body>
@@ -112,7 +215,26 @@
   <div id="hint">touch anywhere ✨</div>
 </div>
 
+<!-- Gallery picker overlay -->
+<div id="gallery-overlay">
+  <div id="gallery-header">
+    <span id="gallery-title">🖼️ Choose a Background</span>
+    <button id="gallery-close">✕</button>
+  </div>
+  <div id="gallery-grid">
+    <div class="gallery-item gallery-none selected" data-src="">
+      <span class="none-icon">🌑</span>
+      <span class="none-label">None</span>
+    </div>
+    <!-- Image tiles injected by JS -->
+  </div>
+</div>
+
 <div id="toolbar">
+  <button class="mode-btn" id="gallery-btn" title="Gallery">
+    <span class="icon">🖼️</span><span class="label">Gallery</span>
+  </button>
+  <div class="toolbar-divider"></div>
   <button class="mode-btn active" data-mode="sparkle">
     <span class="icon">✨</span><span class="label">Sparkles</span>
   </button>
@@ -145,14 +267,15 @@
   const canvas = document.getElementById('c');
   const ctx    = canvas.getContext('2d');
   const hint   = document.getElementById('hint');
-  const dpr    = Math.min(devicePixelRatio || 1, 2); // cap dpr at 2 for perf
+  const dpr    = Math.min(devicePixelRatio || 1, 2);
 
   let W, H;
-  let items = [];          // all active visual items
-  const MAX_ITEMS = 250;   // hard cap to prevent slowdown
+  let items = [];
+  const MAX_ITEMS = 250;
   let hintHidden = false;
   let currentMode = 'sparkle';
   const touchHues = new Map();
+  let bgImageObj = null; // currently active background image
 
   function resize() {
     const r = wrap.getBoundingClientRect();
@@ -162,8 +285,74 @@
   window.addEventListener('resize', resize);
   resize();
 
+  // ── Gallery images list ────────────────────────────────────────────────────
+  // Add filenames here to expand the gallery. Files go in the /Gallery/ folder.
+  const GALLERY_FILES = [
+    '2026-03-16 02_54_40-Documents and 1 more tab - File Explorer.png',
+    '2026-03-16 02_55_20-Documents and 1 more tab - File Explorer.png',
+    '2026-03-16 02_55_57-Documents and 1 more tab - File Explorer.png',
+    '2026-03-16 02_56_30-Documents and 1 more tab - File Explorer.png',
+    '2026-03-16 02_57_03-Documents and 1 more tab - File Explorer.png',
+    '2026-03-16 02_57_44-Documents and 1 more tab - File Explorer.png',
+    '2026-03-16 02_58_07-Documents and 1 more tab - File Explorer.png',
+    '2026-03-16 02_58_38-Documents and 1 more tab - File Explorer.png',
+    '2026-03-16 02_59_39-Documents and 1 more tab - File Explorer.png',
+    '2026-03-16 03_00_00-Documents and 1 more tab - File Explorer.png',
+    '2026-03-16 03_00_46-Documents and 1 more tab - File Explorer.png',
+    '2026-03-16 03_01_08-Documents and 1 more tab - File Explorer.png',
+    '2026-03-16 03_01_28-Documents and 1 more tab - File Explorer.png',
+    '2026-03-16 03_02_19-Documents and 1 more tab - File Explorer.png',
+  ];
+
+  // Build gallery grid
+  const galleryGrid = document.getElementById('gallery-grid');
+  GALLERY_FILES.forEach(filename => {
+    const src = 'Gallery/' + encodeURIComponent(filename);
+    const item = document.createElement('div');
+    item.className = 'gallery-item';
+    item.dataset.src = src;
+    const img = document.createElement('img');
+    img.src = src;
+    img.loading = 'lazy';
+    item.appendChild(img);
+    galleryGrid.appendChild(item);
+  });
+
+  // ── Gallery open/close/select ──────────────────────────────────────────────
+  const galleryOverlay = document.getElementById('gallery-overlay');
+  const galleryBtn     = document.getElementById('gallery-btn');
+
+  document.getElementById('gallery-btn').addEventListener('click', () => {
+    galleryOverlay.classList.add('open');
+  });
+  document.getElementById('gallery-close').addEventListener('click', () => {
+    galleryOverlay.classList.remove('open');
+  });
+
+  galleryGrid.addEventListener('click', e => {
+    const item = e.target.closest('.gallery-item');
+    if (!item) return;
+    galleryGrid.querySelectorAll('.gallery-item.selected').forEach(el => el.classList.remove('selected'));
+    item.classList.add('selected');
+    const src = item.dataset.src;
+    setBackground(src);
+    setTimeout(() => galleryOverlay.classList.remove('open'), 250);
+  });
+
+  function setBackground(src) {
+    if (!src) {
+      bgImageObj = null;
+      galleryBtn.classList.remove('bg-active');
+      return;
+    }
+    const img = new Image();
+    img.onload = () => { bgImageObj = img; };
+    img.src = src;
+    galleryBtn.classList.add('bg-active');
+  }
+
   // ── Mode buttons ───────────────────────────────────────────────────────────
-  document.querySelectorAll('.mode-btn').forEach(btn => {
+  document.querySelectorAll('.mode-btn[data-mode]').forEach(btn => {
     btn.addEventListener('click', () => {
       document.querySelector('.mode-btn.active').classList.remove('active');
       btn.classList.add('active');
@@ -194,7 +383,6 @@
 
   // ── Item classes ───────────────────────────────────────────────────────────
 
-  // Sparkle (original glowing blob)
   class Sparkle {
     constructor(x, y, hue) {
       this.x = x; this.y = y; this.hue = hue;
@@ -225,7 +413,6 @@
     get dead() { return this.alpha <= 0; }
   }
 
-  // Expanding ring (used with sparkle mode)
   class Ring {
     constructor(x, y, hue) {
       this.x = x; this.y = y; this.hue = hue;
@@ -252,7 +439,7 @@
     get dead() { return this.alpha <= 0; }
   }
 
-  // Pre-render emoji to offscreen canvas once, reuse via drawImage (much faster)
+  // Pre-render emoji to offscreen canvas once — reuse via drawImage (GPU-accelerated)
   const emojiCache = {};
   function getEmojiImage(emoji) {
     if (emojiCache[emoji]) return emojiCache[emoji];
@@ -268,12 +455,10 @@
     return oc;
   }
 
-  // Generic emoji item
   class EmojiItem {
     constructor(x, y, emoji, opts = {}) {
       this.x = x; this.y = y;
-      this.emoji = emoji;
-      this.img = getEmojiImage(emoji); // cached — rendered only once
+      this.img = getEmojiImage(emoji);
       this.size = px(opts.size ?? (Math.random() * 18 + 28));
       this.alpha = 1;
       this.decay = opts.decay ?? (Math.random() * 0.018 + 0.010);
@@ -305,7 +490,6 @@
     get dead() { return this.alpha <= 0; }
   }
 
-  // Star (drawn with canvas path for crisp look)
   class Star {
     constructor(x, y, hue) {
       this.x = x; this.y = y; this.hue = hue;
@@ -345,7 +529,6 @@
     get dead() { return this.alpha <= 0; }
   }
 
-  // Heart (drawn with canvas path)
   class Heart {
     constructor(x, y, hue) {
       this.x = x; this.y = y; this.hue = hue;
@@ -353,8 +536,8 @@
       this.alpha = 1;
       this.decay = Math.random() * 0.010 + 0.005;
       this.vx = (Math.random() - 0.5) * px(3);
-      this.vy = -(Math.random() * px(2) + px(1)); // floats up
-      this.gravity = -px(0.03); // slight upward drift
+      this.vy = -(Math.random() * px(2) + px(1));
+      this.gravity = -px(0.03);
       this.wobble = 0;
       this.wobbleSpeed = Math.random() * 0.08 + 0.04;
     }
@@ -381,7 +564,6 @@
     get dead() { return this.alpha <= 0; }
   }
 
-  // Bubble (hollow circle that floats up)
   class Bubble {
     constructor(x, y, hue) {
       this.x = x; this.y = y; this.hue = hue;
@@ -404,7 +586,6 @@
     draw() {
       ctx.save();
       ctx.globalAlpha = Math.max(0, this.alpha);
-      // shimmer highlight
       const g = ctx.createRadialGradient(
         this.x - this.r * 0.3, this.y - this.r * 0.3, this.r * 0.05,
         this.x, this.y, this.r
@@ -439,78 +620,80 @@
           items.push(new Sparkle(x, y, (hue + Math.random() * 40 - 20 + 360) % 360));
         if (burst) items.push(new Ring(x, y, hue));
         break;
-
       case 'star':
         for (let i = 0; i < count; i++)
           items.push(new Star(x, y, (hue + Math.random() * 60 - 30 + 360) % 360));
         break;
-
       case 'heart':
         for (let i = 0; i < count; i++)
           items.push(new Heart(x, y, (hue + Math.random() * 60 - 30 + 360) % 360));
         break;
-
       case 'bubble':
         for (let i = 0; i < (burst ? 5 : 2); i++)
           items.push(new Bubble(x, y, (hue + Math.random() * 60 - 30 + 360) % 360));
         break;
-
       case 'balloon':
         for (let i = 0; i < (burst ? 5 : 2); i++)
           items.push(new EmojiItem(x, y, '🎈', {
             vy: -(Math.random() * px(2) + px(1.5)),
-            gravity: -px(0.02),
-            spin: 0.03,
-            size: Math.random() * 20 + 28,
-            decay: 0.006,
+            gravity: -px(0.02), spin: 0.03,
+            size: Math.random() * 20 + 28, decay: 0.006,
           }));
         break;
-
       case 'butterfly':
         for (let i = 0; i < count; i++)
           items.push(new EmojiItem(x, y, '🦋', {
             vy: (Math.random() - 0.5) * px(3),
-            gravity: 0,
-            spreadX: 4,
-            spin: 0.05,
-            size: Math.random() * 16 + 24,
-            decay: 0.007,
+            gravity: 0, spreadX: 4, spin: 0.05,
+            size: Math.random() * 16 + 24, decay: 0.007,
           }));
         break;
-
       case 'flower':
         for (let i = 0; i < count; i++)
           items.push(new EmojiItem(x, y, Math.random() < 0.5 ? '🌸' : '🌺', {
             vy: (Math.random() - 0.5) * px(2) - px(0.5),
-            gravity: px(0.06),
-            spin: 0.1,
-            size: Math.random() * 16 + 24,
-            decay: 0.008,
+            gravity: px(0.06), spin: 0.1,
+            size: Math.random() * 16 + 24, decay: 0.008,
           }));
         break;
-
       case 'dino':
         for (let i = 0; i < (burst ? 5 : 2); i++)
           items.push(new EmojiItem(x, y, Math.random() < 0.5 ? '🦕' : '🦖', {
             vy: -(Math.random() * px(4) + px(2)),
-            gravity: px(0.18),
-            spreadX: 5,
-            spin: 0.06,
-            size: Math.random() * 20 + 32,
-            decay: 0.009,
+            gravity: px(0.18), spreadX: 5, spin: 0.06,
+            size: Math.random() * 20 + 32, decay: 0.009,
           }));
         break;
     }
   }
 
   // ── Render loop ────────────────────────────────────────────────────────────
-  function loop() {
-    ctx.save();
-    ctx.globalAlpha = 0.12;
-    ctx.fillStyle = '#000';
-    ctx.fillRect(0, 0, W, H);
-    ctx.restore();
+  function drawBackground() {
+    if (bgImageObj) {
+      // Draw background image scaled to cover canvas
+      const iw = bgImageObj.naturalWidth, ih = bgImageObj.naturalHeight;
+      const scale = Math.max(W / iw, H / ih);
+      const dx = (W - iw * scale) / 2;
+      const dy = (H - ih * scale) / 2;
+      ctx.drawImage(bgImageObj, dx, dy, iw * scale, ih * scale);
+      // Subtle trail overlay so old particles fade slightly
+      ctx.save();
+      ctx.globalAlpha = 0.18;
+      ctx.fillStyle = '#000';
+      ctx.fillRect(0, 0, W, H);
+      ctx.restore();
+    } else {
+      // No background — dark fade creates particle trails
+      ctx.save();
+      ctx.globalAlpha = 0.12;
+      ctx.fillStyle = '#000';
+      ctx.fillRect(0, 0, W, H);
+      ctx.restore();
+    }
+  }
 
+  function loop() {
+    drawBackground();
     for (let i = items.length - 1; i >= 0; i--) {
       items[i].update();
       items[i].draw();
@@ -527,16 +710,14 @@
     e.preventDefault();
     hideHint();
     for (const t of e.changedTouches) {
-      const hue = getHue(t.identifier);
-      spawn(t.clientX, t.clientY, hue, true);
+      spawn(t.clientX, t.clientY, getHue(t.identifier), true);
     }
   }, { passive: false });
 
   cw.addEventListener('touchmove', (e) => {
     e.preventDefault();
     for (const t of e.changedTouches) {
-      const hue = shiftHue(t.identifier);
-      spawn(t.clientX, t.clientY, hue, false);
+      spawn(t.clientX, t.clientY, shiftHue(t.identifier), false);
     }
   }, { passive: false });
 
@@ -547,8 +728,7 @@
   // Mouse (desktop testing)
   let mouseDown = false, mouseHue = 0;
   cw.addEventListener('mousedown', (e) => {
-    mouseDown = true;
-    mouseHue = Math.random() * 360;
+    mouseDown = true; mouseHue = Math.random() * 360;
     spawn(e.clientX, e.clientY, mouseHue, true);
   });
   cw.addEventListener('mousemove', (e) => {
