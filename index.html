@@ -334,6 +334,11 @@
     '2026-03-16 03_01_08-Documents and 1 more tab - File Explorer.png',
     '2026-03-16 03_01_28-Documents and 1 more tab - File Explorer.png',
     '2026-03-16 03_02_19-Documents and 1 more tab - File Explorer.png',
+    '2026-03-17 03_01_23-Settings.png',
+    '2026-03-17 03_01_57-Settings.png',
+    '2026-03-17 03_02_25-Settings.png',
+    '2026-03-17 03_02_50-Settings.png',
+    '2026-03-17 03_04_25-Settings.png',
   ];
 
   const galleryGrid    = document.getElementById('gallery-grid');
@@ -642,28 +647,32 @@
   // Charge ring — visual feedback while holding
   class ChargeRing {
     constructor(x, y, hue, touchId) {
-      this.cx = x; this.cy = y; this.hue = hue; this.touchId = touchId;
-      this.alpha = 0;
+      this.cx = x * dpr; this.cy = y * dpr; this.hue = hue; this.touchId = touchId;
+      this.alpha = 0; this.charge = 0; this.r = px(18);
     }
     update() {
       const info = touchCharges.get(this.touchId);
-      if (!info) { this.alpha = 0; return; }
+      if (!info) {
+        // Touch ended — fade out gracefully instead of snapping to invisible
+        this.alpha -= 0.07;
+        return;
+      }
       this.cx = info.x * dpr; this.cy = info.y * dpr;
       this.charge = Math.min((Date.now() - info.startTime) / 1000, 1);
       this.alpha = this.charge > 0.15 ? this.charge * 0.6 : 0;
+      this.r = px(18 + this.charge * 55);
       this.hue = (this.hue + 3) % 360;
     }
     draw() {
       if (this.alpha <= 0) return;
-      const r = px(18 + this.charge * 55);
       ctx.save();
       ctx.globalAlpha = this.alpha;
       ctx.strokeStyle = `hsl(${this.hue},100%,70%)`;
       ctx.lineWidth = px(3);
-      ctx.beginPath(); ctx.arc(this.cx, this.cy, r, 0, Math.PI * 2); ctx.stroke();
+      ctx.beginPath(); ctx.arc(this.cx, this.cy, this.r, 0, Math.PI * 2); ctx.stroke();
       ctx.restore();
     }
-    get dead() { return !touchCharges.has(this.touchId); }
+    get dead() { return !touchCharges.has(this.touchId) && this.alpha <= 0; }
   }
 
   // Emoji item — uses pre-rendered offscreen canvas (GPU fast)
@@ -867,23 +876,24 @@
     }
   }, { passive: false });
 
-  cw.addEventListener('touchend', e => {
-    for (const t of e.changedTouches) {
-      const info = touchCharges.get(t.identifier);
-      if (info) {
+  function endTouch(t, fireChargedBurst) {
+    const info = touchCharges.get(t.identifier);
+    if (info) {
+      if (fireChargedBurst) {
         const held = Date.now() - info.startTime;
         if (held > 400) {
-          // Charged release — big burst
           const charge = Math.min(held / 1000, 3);
-          const bonus = Math.floor(charge * 14);
-          spawnParticles(info.x, info.y, getHue(t.identifier), bonus, true);
+          spawnParticles(info.x, info.y, getHue(t.identifier), Math.floor(charge * 14), true);
           playSound(currentMode);
         }
-        touchCharges.delete(t.identifier);
       }
-      touchHues.delete(t.identifier);
+      touchCharges.delete(t.identifier);
     }
-  }, { passive: false });
+    touchHues.delete(t.identifier);
+  }
+
+  cw.addEventListener('touchend',    e => { for (const t of e.changedTouches) endTouch(t, true);  }, { passive: false });
+  cw.addEventListener('touchcancel', e => { for (const t of e.changedTouches) endTouch(t, false); }, { passive: false });
 
   // Mouse (desktop)
   let mouseDown = false, mouseHue = 0;
@@ -901,19 +911,24 @@
     mouseHue = (mouseHue + 2) % 360;
     spawn(e.clientX, e.clientY, mouseHue, false);
   });
-  cw.addEventListener('mouseup', e => {
+  function endMouse(fireChargedBurst) {
     const info = touchCharges.get('mouse');
     if (info) {
-      const held = Date.now() - info.startTime;
-      if (held > 400) {
-        const charge = Math.min(held / 1000, 3);
-        spawnParticles(info.x, info.y, mouseHue, Math.floor(charge * 14), true);
-        playSound(currentMode);
+      if (fireChargedBurst) {
+        const held = Date.now() - info.startTime;
+        if (held > 400) {
+          const charge = Math.min(held / 1000, 3);
+          spawnParticles(info.x, info.y, mouseHue, Math.floor(charge * 14), true);
+          playSound(currentMode);
+        }
       }
       touchCharges.delete('mouse');
     }
     mouseDown = false;
-  });
+  }
+
+  cw.addEventListener('mouseup',    () => endMouse(true));
+  cw.addEventListener('mouseleave', () => endMouse(false));
 
   window.addEventListener('contextmenu', e => e.preventDefault());
 </script>
