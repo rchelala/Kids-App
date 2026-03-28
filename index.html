@@ -262,53 +262,260 @@
 
   // ── Audio ──────────────────────────────────────────────────────────────────
   let audioCtx = null;
+  let masterComp = null;
   let lastSoundTime = 0;
-  const SOUND_GAP = 100; // ms between sounds
+  const SOUND_GAP = 120;
 
   function ac() {
-    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (!audioCtx) {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      // Master compressor prevents clipping when sounds stack
+      masterComp = audioCtx.createDynamicsCompressor();
+      masterComp.threshold.value = -18;
+      masterComp.ratio.value = 10;
+      masterComp.attack.value = 0.003;
+      masterComp.release.value = 0.2;
+      masterComp.connect(audioCtx.destination);
+    }
     return audioCtx;
   }
 
-  function noise(ctx, dur, vol = 0.25) {
-    const buf = ctx.createBuffer(1, ctx.sampleRate * dur, ctx.sampleRate);
+  // Shared helpers — all route through masterComp
+  function noiseNode(a, dur, vol, startAt = 0, envelope = 'decay') {
+    const buf = a.createBuffer(1, a.sampleRate * dur, a.sampleRate);
     const d = buf.getChannelData(0);
-    for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / d.length);
-    const src = ctx.createBufferSource();
-    src.buffer = buf;
-    const g = ctx.createGain();
-    src.connect(g); g.connect(ctx.destination);
-    g.gain.setValueAtTime(vol, ctx.currentTime);
-    g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + dur);
-    src.start(); src.stop(ctx.currentTime + dur);
+    for (let i = 0; i < d.length; i++)
+      d[i] = (Math.random() * 2 - 1) * (envelope === 'decay' ? (1 - i/d.length) : (i/d.length));
+    const src = a.createBufferSource(); src.buffer = buf;
+    const g = a.createGain();
+    src.connect(g); g.connect(masterComp);
+    g.gain.setValueAtTime(vol, a.currentTime + startAt);
+    g.gain.exponentialRampToValueAtTime(0.001, a.currentTime + startAt + dur);
+    src.start(a.currentTime + startAt); src.stop(a.currentTime + startAt + dur);
+    return { src, g };
   }
 
-  function tone(ctx, freq, dur, vol = 0.15, type = 'sine', freqEnd = null) {
-    const osc = ctx.createOscillator();
-    osc.type = type;
-    const g = ctx.createGain();
-    osc.connect(g); g.connect(ctx.destination);
-    osc.frequency.setValueAtTime(freq, ctx.currentTime);
-    if (freqEnd) osc.frequency.exponentialRampToValueAtTime(freqEnd, ctx.currentTime + dur);
-    g.gain.setValueAtTime(vol, ctx.currentTime);
-    g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + dur);
-    osc.start(); osc.stop(ctx.currentTime + dur);
+  function oscNode(a, type, freq, dur, vol, startAt = 0, freqEnd = null) {
+    const osc = a.createOscillator(); osc.type = type;
+    const g = a.createGain();
+    osc.connect(g); g.connect(masterComp);
+    osc.frequency.setValueAtTime(freq, a.currentTime + startAt);
+    if (freqEnd) osc.frequency.exponentialRampToValueAtTime(freqEnd, a.currentTime + startAt + dur);
+    g.gain.setValueAtTime(vol, a.currentTime + startAt);
+    g.gain.exponentialRampToValueAtTime(0.001, a.currentTime + startAt + dur);
+    osc.start(a.currentTime + startAt); osc.stop(a.currentTime + startAt + dur + 0.01);
+    return { osc, g };
   }
+
+  const PENTA = [523, 659, 784, 1047, 1319]; // C5 pentatonic — musical & happy
+  const WARM  = [262, 330, 392, 494, 523];   // C4 pentatonic — warm & low
+  const BELL  = [392, 494, 587, 740, 880];   // G4 pentatonic
 
   const SOUNDS = {
-    sparkle:  a => tone(a, 1400 + Math.random()*600, 0.25, 0.12, 'sine', 300),
-    star:     a => tone(a, 1600, 0.2, 0.1, 'sine'),
-    heart:    a => tone(a, 480, 0.2, 0.13, 'sine'),
-    bubble:   a => noise(a, 0.08, 0.3),
-    firework: a => { tone(a, 140, 0.35, 0.25, 'sawtooth', 50); noise(a, 0.2, 0.15); },
-    snow:     a => noise(a, 0.3, 0.04),
-    balloon:  a => tone(a, 300, 0.22, 0.1, 'sawtooth', 700),
-    butterfly:a => { [0,0.06,0.12].forEach(t => { const o=a.createOscillator(),g=a.createGain(); o.connect(g);g.connect(a.destination); o.frequency.value=700+Math.random()*400; g.gain.setValueAtTime(0.07,a.currentTime+t); g.gain.exponentialRampToValueAtTime(0.001,a.currentTime+t+0.07); o.start(a.currentTime+t); o.stop(a.currentTime+t+0.08); }); },
-    flower:   a => tone(a, 880, 0.45, 0.09, 'sine'),
-    dino:     a => tone(a, 90,  0.4,  0.15, 'sawtooth', 55),
-    food:     a => tone(a, 380, 0.15, 0.13, 'triangle', 140),
-    vehicle:  a => tone(a, 90,  0.35, 0.1,  'sawtooth', 180),
-    silly:    a => tone(a, 550, 0.4,  0.15, 'sine', 90),
+
+    // ✨ Magic chime — random pentatonic note with harmonics
+    sparkle: a => {
+      const f = PENTA[Math.floor(Math.random() * PENTA.length)];
+      const t = a.currentTime;
+      [[f, 0.13, 0.55], [f*2, 0.06, 0.3], [f*3, 0.025, 0.18]].forEach(([freq, vol, dur]) => {
+        const osc = a.createOscillator(); const g = a.createGain();
+        osc.connect(g); g.connect(masterComp);
+        osc.frequency.value = freq;
+        g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(vol, t + 0.008);
+        g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+        osc.start(t); osc.stop(t + dur + 0.01);
+      });
+    },
+
+    // ⭐ Xylophone hit — sine + inharmonic overtone (marimba feel)
+    star: a => {
+      const f = BELL[Math.floor(Math.random() * BELL.length)];
+      const t = a.currentTime;
+      oscNode(a, 'sine', f, 0.45, 0.18);
+      oscNode(a, 'sine', f * 2.76, 0.12, 0.07); // inharmonic = mallet instrument
+    },
+
+    // ❤️ Harp pluck — three harmonic sines, warm and gentle
+    heart: a => {
+      const f = WARM[Math.floor(Math.random() * WARM.length)];
+      const t = a.currentTime;
+      [1, 2, 3].forEach((h, i) => {
+        const osc = a.createOscillator(); const g = a.createGain();
+        osc.connect(g); g.connect(masterComp);
+        osc.frequency.value = f * h;
+        g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.11 / (i+1), t + 0.015);
+        g.gain.exponentialRampToValueAtTime(0.001, t + 0.75 / (i * 0.4 + 1));
+        osc.start(t); osc.stop(t + 0.9);
+      });
+    },
+
+    // 🫧 Bubble — rising pitch glide then wet pop
+    bubble: a => {
+      const t = a.currentTime;
+      const osc = a.createOscillator(); const g = a.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(180, t);
+      osc.frequency.exponentialRampToValueAtTime(900, t + 0.16);
+      osc.connect(g); g.connect(masterComp);
+      g.gain.setValueAtTime(0.14, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.19);
+      osc.start(t); osc.stop(t + 0.2);
+      noiseNode(a, 0.04, 0.35, 0.14); // pop
+    },
+
+    // 🎆 Fireworks — whoosh up, boom + sparkle burst
+    firework: a => {
+      const t = a.currentTime;
+      // Whoosh (noise ramps UP then cuts)
+      const wBuf = a.createBuffer(1, a.sampleRate * 0.28, a.sampleRate);
+      const wd = wBuf.getChannelData(0);
+      for (let i = 0; i < wd.length; i++) wd[i] = (Math.random()*2-1) * (i/wd.length);
+      const wSrc = a.createBufferSource(); wSrc.buffer = wBuf;
+      const wFilter = a.createBiquadFilter(); wFilter.type = 'bandpass';
+      wFilter.frequency.setValueAtTime(300, t);
+      wFilter.frequency.exponentialRampToValueAtTime(4000, t + 0.26);
+      const wGain = a.createGain();
+      wGain.gain.setValueAtTime(0.18, t); wGain.gain.exponentialRampToValueAtTime(0.001, t + 0.28);
+      wSrc.connect(wFilter); wFilter.connect(wGain); wGain.connect(masterComp);
+      wSrc.start(t); wSrc.stop(t + 0.3);
+      // Boom — low sine drop
+      const bOsc = a.createOscillator(); const bGain = a.createGain();
+      bOsc.frequency.setValueAtTime(90, t + 0.26);
+      bOsc.frequency.exponentialRampToValueAtTime(28, t + 0.7);
+      bGain.gain.setValueAtTime(0.45, t + 0.26); bGain.gain.exponentialRampToValueAtTime(0.001, t + 0.72);
+      bOsc.connect(bGain); bGain.connect(masterComp);
+      bOsc.start(t + 0.26); bOsc.stop(t + 0.75);
+      // Sparkle burst — highpass noise
+      noiseNode(a, 0.4, 0.12, 0.26);
+      const hpf = a.createBiquadFilter(); hpf.type = 'highpass'; hpf.frequency.value = 3000;
+      noiseNode(a, 0.35, 0.08, 0.28);
+    },
+
+    // ❄️ Snow — soft wind chime bell
+    snow: a => {
+      const f = [1047, 1319, 1568, 2093][Math.floor(Math.random() * 4)];
+      const t = a.currentTime;
+      const osc = a.createOscillator(); const g = a.createGain();
+      osc.frequency.value = f;
+      osc.connect(g); g.connect(masterComp);
+      g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.07, t + 0.005);
+      g.gain.exponentialRampToValueAtTime(0.001, t + 1.0);
+      osc.start(t); osc.stop(t + 1.05);
+      noiseNode(a, 0.18, 0.025); // soft breath
+    },
+
+    // 🎈 Balloon — rubbery squeak with filtered sawtooth
+    balloon: a => {
+      const t = a.currentTime;
+      const osc = a.createOscillator(); osc.type = 'sawtooth';
+      const filt = a.createBiquadFilter(); filt.type = 'lowpass';
+      const g = a.createGain();
+      osc.frequency.setValueAtTime(220, t);
+      osc.frequency.exponentialRampToValueAtTime(680, t + 0.09);
+      osc.frequency.exponentialRampToValueAtTime(160, t + 0.24);
+      filt.frequency.setValueAtTime(500, t);
+      filt.frequency.exponentialRampToValueAtTime(2200, t + 0.09);
+      filt.frequency.exponentialRampToValueAtTime(400, t + 0.24);
+      g.gain.setValueAtTime(0.13, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.28);
+      osc.connect(filt); filt.connect(g); g.connect(masterComp);
+      osc.start(t); osc.stop(t + 0.3);
+    },
+
+    // 🦋 Butterfly — rapid trill alternating two notes
+    butterfly: a => {
+      const t = a.currentTime;
+      [0, 0.045, 0.09, 0.135, 0.18].forEach((delay, i) => {
+        const osc = a.createOscillator(); const g = a.createGain();
+        osc.frequency.value = i % 2 === 0 ? 900 : 1130;
+        osc.connect(g); g.connect(masterComp);
+        g.gain.setValueAtTime(0.08, t + delay);
+        g.gain.exponentialRampToValueAtTime(0.001, t + delay + 0.055);
+        osc.start(t + delay); osc.stop(t + delay + 0.06);
+      });
+    },
+
+    // 🌸 Flower — warm bell chord (3 harmonics)
+    flower: a => {
+      const f = BELL[Math.floor(Math.random() * BELL.length)];
+      const t = a.currentTime;
+      [1, 2, 3].forEach((h, i) => {
+        const osc = a.createOscillator(); const g = a.createGain();
+        osc.frequency.value = f * h;
+        osc.connect(g); g.connect(masterComp);
+        g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.09 / (i+1), t + 0.01);
+        g.gain.exponentialRampToValueAtTime(0.001, t + 0.7 / (i * 0.5 + 1));
+        osc.start(t); osc.stop(t + 0.75);
+      });
+    },
+
+    // 🦕 Dino — FM roar: sawtooth carrier + LFO growl + filter sweep
+    dino: a => {
+      const t = a.currentTime;
+      const carrier = a.createOscillator(); carrier.type = 'sawtooth';
+      carrier.frequency.setValueAtTime(85, t);
+      carrier.frequency.exponentialRampToValueAtTime(45, t + 0.45);
+      const lfo = a.createOscillator(); lfo.frequency.value = 9;
+      const lfoG = a.createGain(); lfoG.gain.value = 35;
+      lfo.connect(lfoG); lfoG.connect(carrier.frequency);
+      const filt = a.createBiquadFilter(); filt.type = 'lowpass';
+      filt.frequency.setValueAtTime(900, t); filt.frequency.exponentialRampToValueAtTime(180, t + 0.45);
+      const g = a.createGain();
+      g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.28, t + 0.04);
+      g.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
+      carrier.connect(filt); filt.connect(g); g.connect(masterComp);
+      lfo.start(t); carrier.start(t); lfo.stop(t + 0.55); carrier.stop(t + 0.55);
+    },
+
+    // 🍕 Food — cartoon munch crunch (three noise pops + pitched drop)
+    food: a => {
+      const t = a.currentTime;
+      [0, 0.07, 0.13].forEach(delay => {
+        const buf = a.createBuffer(1, a.sampleRate * 0.045, a.sampleRate);
+        const d = buf.getChannelData(0);
+        for (let i = 0; i < d.length; i++) d[i] = (Math.random()*2-1) * (1 - i/d.length);
+        const src = a.createBufferSource(); src.buffer = buf;
+        const filt = a.createBiquadFilter(); filt.type = 'bandpass';
+        filt.frequency.value = 900 - delay * 3000;
+        const g = a.createGain(); g.gain.value = 0.3;
+        src.connect(filt); filt.connect(g); g.connect(masterComp);
+        src.start(t + delay); src.stop(t + delay + 0.05);
+      });
+      oscNode(a, 'triangle', 460, 0.18, 0.12, 0, 210); // yummy descending tone
+    },
+
+    // 🚗 Vehicles — engine rumble (sawtooth + amplitude LFO) then beep
+    vehicle: a => {
+      const t = a.currentTime;
+      const osc = a.createOscillator(); osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(52, t);
+      osc.frequency.exponentialRampToValueAtTime(115, t + 0.18);
+      osc.frequency.exponentialRampToValueAtTime(75, t + 0.38);
+      const lfo = a.createOscillator(); lfo.frequency.value = 28; // engine buzz
+      const lfoG = a.createGain(); lfoG.gain.value = 0.4;
+      lfo.connect(lfoG);
+      const g = a.createGain();
+      lfoG.connect(g.gain);
+      g.gain.setValueAtTime(0.13, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.42);
+      osc.connect(g); g.connect(masterComp);
+      lfo.start(t); osc.start(t); lfo.stop(t + 0.44); osc.stop(t + 0.44);
+      oscNode(a, 'square', 440, 0.1, 0.09, 0.12); // horn beep
+    },
+
+    // 😜 Silly — cartoon spring boing with descending wobble
+    silly: a => {
+      const t = a.currentTime;
+      const osc = a.createOscillator();
+      osc.frequency.setValueAtTime(850, t);
+      osc.frequency.exponentialRampToValueAtTime(140, t + 0.45);
+      const lfo = a.createOscillator();
+      lfo.frequency.setValueAtTime(18, t); lfo.frequency.exponentialRampToValueAtTime(5, t + 0.45);
+      const lfoG = a.createGain();
+      lfoG.gain.setValueAtTime(60, t); lfoG.gain.exponentialRampToValueAtTime(8, t + 0.45);
+      lfo.connect(lfoG); lfoG.connect(osc.frequency);
+      const g = a.createGain();
+      g.gain.setValueAtTime(0.22, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.48);
+      osc.connect(g); g.connect(masterComp);
+      lfo.start(t); osc.start(t); lfo.stop(t + 0.5); osc.stop(t + 0.5);
+    },
   };
 
   function playSound(mode) {
