@@ -233,6 +233,9 @@
   <button class="mode-btn" data-mode="food"><span class="icon">🍕</span><span class="label">Food</span></button>
   <button class="mode-btn" data-mode="vehicle"><span class="icon">🚗</span><span class="label">Vehicles</span></button>
   <button class="mode-btn" data-mode="silly"><span class="icon">🤪</span><span class="label">Silly</span></button>
+  <div class="toolbar-divider"></div>
+  <button class="mode-btn" data-mode="animal"><span class="icon">🐾</span><span class="label">Animals</span></button>
+  <button class="mode-btn" data-mode="pop"><span class="icon">🎊</span><span class="label">Pop!</span></button>
 </div>
 
 <script>
@@ -245,11 +248,13 @@
 
   let W, H;
   let items = [];
+  let activeBubbles = []; // floating bubbles for Pop! mode
+  let lastBubbleSpawn = 0;
   const MAX_ITEMS = 300;
   let hintHidden = false;
   let currentMode = 'sparkle';
   const touchHues  = new Map();
-  const touchCharges = new Map(); // hold-to-grow tracking
+  const touchCharges = new Map();
   let bgImageObj = null;
 
   function resize() {
@@ -500,6 +505,115 @@
       oscNode(a, 'square', 440, 0.1, 0.09, 0.12); // horn beep
     },
 
+    // 🐶 Dog bark — two quick filtered noise bursts
+    dog: a => {
+      const t = a.currentTime;
+      [0, 0.18].forEach(delay => {
+        const buf = a.createBuffer(1, a.sampleRate * 0.12, a.sampleRate);
+        const d = buf.getChannelData(0);
+        for (let i = 0; i < d.length; i++) d[i] = (Math.random()*2-1) * (1 - i/d.length);
+        const src = a.createBufferSource(); src.buffer = buf;
+        const f = a.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 520; f.Q.value = 1.5;
+        const g = a.createGain(); g.gain.setValueAtTime(0.35, t+delay); g.gain.exponentialRampToValueAtTime(0.001, t+delay+0.12);
+        src.connect(f); f.connect(g); g.connect(masterComp);
+        src.start(t+delay); src.stop(t+delay+0.13);
+      });
+    },
+
+    // 🐱 Cat meow — sine with formant shaping, rises then falls
+    cat: a => {
+      const t = a.currentTime;
+      const osc = a.createOscillator(); const g = a.createGain();
+      const f = a.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 900; f.Q.value = 3;
+      osc.frequency.setValueAtTime(280, t); osc.frequency.linearRampToValueAtTime(480, t+0.2); osc.frequency.exponentialRampToValueAtTime(220, t+0.55);
+      g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.22, t+0.08); g.gain.exponentialRampToValueAtTime(0.001, t+0.6);
+      osc.connect(f); f.connect(g); g.connect(masterComp);
+      osc.start(t); osc.stop(t+0.65);
+    },
+
+    // 🐮 Cow moo — low sawtooth with slow vibrato
+    cow: a => {
+      const t = a.currentTime;
+      const osc = a.createOscillator(); osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(95, t); osc.frequency.linearRampToValueAtTime(115, t+0.15); osc.frequency.exponentialRampToValueAtTime(85, t+0.75);
+      const lfo = a.createOscillator(); lfo.frequency.value = 5;
+      const lfoG = a.createGain(); lfoG.gain.value = 6;
+      lfo.connect(lfoG); lfoG.connect(osc.frequency);
+      const filt = a.createBiquadFilter(); filt.type = 'lowpass'; filt.frequency.value = 600;
+      const g = a.createGain(); g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.28, t+0.1); g.gain.exponentialRampToValueAtTime(0.001, t+0.8);
+      osc.connect(filt); filt.connect(g); g.connect(masterComp);
+      lfo.start(t); osc.start(t); lfo.stop(t+0.85); osc.stop(t+0.85);
+    },
+
+    // 🐷 Pig oink — nasal bandpass sawtooth, quick double snort
+    pig: a => {
+      const t = a.currentTime;
+      [0, 0.22].forEach((delay, i) => {
+        const osc = a.createOscillator(); osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(320, t+delay); osc.frequency.exponentialRampToValueAtTime(220, t+delay+0.15);
+        const f = a.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 700; f.Q.value = 4;
+        const g = a.createGain(); g.gain.setValueAtTime(0.18, t+delay); g.gain.exponentialRampToValueAtTime(0.001, t+delay+0.18);
+        osc.connect(f); f.connect(g); g.connect(masterComp);
+        osc.start(t+delay); osc.stop(t+delay+0.2);
+      });
+    },
+
+    // 🐸 Frog ribbit — two short low croaks
+    frog: a => {
+      const t = a.currentTime;
+      [0, 0.2].forEach(delay => {
+        const osc = a.createOscillator(); osc.type = 'square';
+        osc.frequency.setValueAtTime(180, t+delay); osc.frequency.exponentialRampToValueAtTime(120, t+delay+0.12);
+        const f = a.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 800;
+        const g = a.createGain(); g.gain.setValueAtTime(0.2, t+delay); g.gain.exponentialRampToValueAtTime(0.001, t+delay+0.14);
+        osc.connect(f); f.connect(g); g.connect(masterComp);
+        osc.start(t+delay); osc.stop(t+delay+0.15);
+      });
+    },
+
+    // 🦁 Lion roar — deep FM with growl, big and dramatic
+    lion: a => {
+      const t = a.currentTime;
+      const carrier = a.createOscillator(); carrier.type = 'sawtooth';
+      carrier.frequency.setValueAtTime(65, t); carrier.frequency.exponentialRampToValueAtTime(38, t+0.65);
+      const lfo = a.createOscillator(); lfo.frequency.value = 11;
+      const lfoG = a.createGain(); lfoG.gain.setValueAtTime(45, t); lfoG.gain.exponentialRampToValueAtTime(15, t+0.65);
+      lfo.connect(lfoG); lfoG.connect(carrier.frequency);
+      const filt = a.createBiquadFilter(); filt.type = 'lowpass'; filt.frequency.setValueAtTime(1200, t); filt.frequency.exponentialRampToValueAtTime(250, t+0.65);
+      const g = a.createGain(); g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.38, t+0.06); g.gain.exponentialRampToValueAtTime(0.001, t+0.7);
+      carrier.connect(filt); filt.connect(g); g.connect(masterComp);
+      noiseNode(a, 0.5, 0.08); // breath layer
+      lfo.start(t); carrier.start(t); lfo.stop(t+0.75); carrier.stop(t+0.75);
+    },
+
+    // 🐘 Elephant trumpet — low rumble then dramatic upward sweep
+    elephant: a => {
+      const t = a.currentTime;
+      // Rumble
+      const osc1 = a.createOscillator(); osc1.type = 'sawtooth'; osc1.frequency.value = 55;
+      const g1 = a.createGain(); g1.gain.setValueAtTime(0.12, t); g1.gain.exponentialRampToValueAtTime(0.001, t+0.25);
+      osc1.connect(g1); g1.connect(masterComp); osc1.start(t); osc1.stop(t+0.28);
+      // Trumpet sweep
+      const osc2 = a.createOscillator(); osc2.type = 'sawtooth';
+      osc2.frequency.setValueAtTime(110, t+0.18); osc2.frequency.exponentialRampToValueAtTime(880, t+0.55);
+      const filt = a.createBiquadFilter(); filt.type = 'bandpass'; filt.frequency.value = 600; filt.Q.value = 2;
+      const g2 = a.createGain(); g2.gain.setValueAtTime(0, t+0.18); g2.gain.linearRampToValueAtTime(0.3, t+0.25); g2.gain.exponentialRampToValueAtTime(0.001, t+0.6);
+      osc2.connect(filt); filt.connect(g2); g2.connect(masterComp); osc2.start(t+0.18); osc2.stop(t+0.65);
+    },
+
+    // 🦆 Duck quack — nasal descending bandpass, two quacks
+    duck: a => {
+      const t = a.currentTime;
+      [0, 0.25].forEach(delay => {
+        const osc = a.createOscillator(); osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(380, t+delay); osc.frequency.exponentialRampToValueAtTime(260, t+delay+0.14);
+        const f = a.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 1100; f.Q.value = 5;
+        const g = a.createGain(); g.gain.setValueAtTime(0.22, t+delay); g.gain.exponentialRampToValueAtTime(0.001, t+delay+0.16);
+        osc.connect(f); f.connect(g); g.connect(masterComp);
+        osc.start(t+delay); osc.stop(t+delay+0.18);
+      });
+    },
+
     // 😜 Silly — cartoon spring boing with descending wobble
     silly: a => {
       const t = a.currentTime;
@@ -597,6 +711,8 @@
       document.querySelector('.mode-btn.active').classList.remove('active');
       btn.classList.add('active');
       currentMode = btn.dataset.mode;
+      // Clear floating bubbles when leaving Pop! mode
+      if (currentMode !== 'pop') activeBubbles = [];
     });
   });
 
@@ -928,11 +1044,79 @@
     get dead() { return this.alpha <= 0; }
   }
 
+  // ── ActiveBubble — floats up the screen waiting to be popped ──────────────
+  class ActiveBubble {
+    constructor() {
+      this.x = (Math.random() * 0.78 + 0.11) * W;
+      this.y = H + px(50);
+      this.r = px(Math.random() * 28 + 22);
+      this.vy = -(Math.random() * px(1.3) + px(0.6));
+      this.vx = (Math.random() - 0.5) * px(0.4);
+      this.wobble = Math.random() * Math.PI * 2;
+      this.wobbleSpeed = Math.random() * 0.025 + 0.012;
+      this.hue = Math.random() * 360;
+      this.alpha = 0.9;
+      this.popped = false;
+      this.popProgress = 0;
+    }
+    contains(tx, ty) {
+      const dx = this.x - tx, dy = this.y - ty;
+      return dx*dx + dy*dy < this.r * this.r * 1.4; // generous hit area for small fingers
+    }
+    pop() {
+      if (this.popped) return;
+      this.popped = true;
+      for (let i = 0; i < 10; i++) items.push(new Sparkle(this.x, this.y, (this.hue + Math.random()*40-20+360)%360));
+      items.push(new Ring(this.x, this.y, this.hue));
+    }
+    update() {
+      if (this.popped) { this.popProgress += 0.14; this.alpha -= 0.1; return; }
+      this.wobble += this.wobbleSpeed;
+      this.x += this.vx + Math.sin(this.wobble) * px(0.35);
+      this.y += this.vy;
+    }
+    draw() {
+      if (this.alpha <= 0) return;
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, this.alpha);
+      if (this.popped) {
+        ctx.strokeStyle = `hsl(${this.hue},100%,70%)`;
+        ctx.lineWidth = Math.max(px(1), px(3) * (1 - this.popProgress));
+        ctx.beginPath(); ctx.arc(this.x, this.y, this.r * (1 + this.popProgress * 2.5), 0, Math.PI*2); ctx.stroke();
+      } else {
+        ctx.strokeStyle = `hsla(${this.hue},90%,75%,0.95)`;
+        ctx.lineWidth = px(3);
+        ctx.beginPath(); ctx.arc(this.x, this.y, this.r, 0, Math.PI*2); ctx.stroke();
+        // Highlight
+        ctx.fillStyle = 'rgba(255,255,255,0.18)';
+        ctx.beginPath(); ctx.arc(this.x - this.r*0.3, this.y - this.r*0.3, this.r*0.28, 0, Math.PI*2); ctx.fill();
+        // Subtle inner colour fill
+        ctx.fillStyle = `hsla(${this.hue},80%,75%,0.08)`;
+        ctx.beginPath(); ctx.arc(this.x, this.y, this.r, 0, Math.PI*2); ctx.fill();
+      }
+      ctx.restore();
+    }
+    get dead() { return this.alpha <= 0 || (!this.popped && this.y < -px(60)); }
+  }
+
+  // ── Animals ────────────────────────────────────────────────────────────────
+  const ANIMALS = [
+    { emoji: '🐶', sound: 'dog'      },
+    { emoji: '🐱', sound: 'cat'      },
+    { emoji: '🐮', sound: 'cow'      },
+    { emoji: '🐷', sound: 'pig'      },
+    { emoji: '🐸', sound: 'frog'     },
+    { emoji: '🦁', sound: 'lion'     },
+    { emoji: '🐘', sound: 'elephant' },
+    { emoji: '🦆', sound: 'duck'     },
+  ];
+
   // Pre-warm emoji cache
   ['🎈','🦋','🌸','🌺','🦕','🦖',
    '🍕','🍦','🎂','🍉','🍩','🍪','🍫','🍓',
    '🚗','🚀','✈️','🚂','🚁','🏎️','🛸',
-   '😂','🤪','😜','🥳','😝','🤡','👻','🤩'].forEach(getEmojiImage);
+   '😂','🤪','😜','🥳','😝','🤡','👻','🤩',
+   '🐶','🐱','🐮','🐷','🐸','🦁','🐘','🦆'].forEach(getEmojiImage);
 
   const FOOD     = ['🍕','🍦','🎂','🍉','🍩','🍪','🍫','🍓'];
   const VEHICLES = ['🚗','🚀','✈️','🚂','🚁','🏎️','🛸'];
@@ -1031,6 +1215,19 @@
             spreadX: 5, spin: 0.12, size: Math.random() * 20 + 30, decay: 0.007,
           }));
         break;
+
+      case 'animal': {
+        const animal = ANIMALS[Math.floor(Math.random() * ANIMALS.length)];
+        for (let i = 0; i < count; i++)
+          items.push(new EmojiItem(x, y, animal.emoji, {
+            vy: -(Math.random() * px(5) + px(2)), gravity: px(0.1),
+            spreadX: 4, spin: 0.05, size: Math.random() * 22 + 34, decay: 0.007,
+          }));
+        if (burst) {
+          try { SOUNDS[animal.sound]?.(ac()); } catch(e) {}
+        }
+        break;
+      }
     }
   }
 
@@ -1050,6 +1247,24 @@
       ctx.fillRect(0, 0, W, H);
       ctx.restore();
     }
+
+    // Auto-spawn floating bubbles in Pop! mode
+    if (currentMode === 'pop') {
+      const now = Date.now();
+      const live = activeBubbles.filter(b => !b.popped).length;
+      if (now - lastBubbleSpawn > 1200 && live < 12) {
+        activeBubbles.push(new ActiveBubble());
+        lastBubbleSpawn = now;
+      }
+    }
+
+    // Update & draw floating bubbles
+    for (let i = activeBubbles.length - 1; i >= 0; i--) {
+      activeBubbles[i].update();
+      activeBubbles[i].draw();
+      if (activeBubbles[i].dead) activeBubbles.splice(i, 1);
+    }
+
     for (let i = items.length - 1; i >= 0; i--) {
       items[i].update();
       items[i].draw();
@@ -1067,17 +1282,35 @@
     hideHint();
     for (const t of e.changedTouches) {
       const hue = getHue(t.identifier);
-      // Record charge start
+      const cx = t.clientX * dpr, cy = t.clientY * dpr;
+
+      // Pop! mode — check for bubble hits first
+      if (currentMode === 'pop') {
+        let hit = false;
+        for (const b of activeBubbles) {
+          if (!b.popped && b.contains(cx, cy)) {
+            b.pop(); playSound('bubble'); hit = true; break;
+          }
+        }
+        if (!hit) {
+          // Miss — small sparkle so there's still feedback
+          for (let i = 0; i < 4; i++) items.push(new Sparkle(cx, cy, Math.random()*360));
+        }
+        continue;
+      }
+
       touchCharges.set(t.identifier, { x: t.clientX, y: t.clientY, startTime: Date.now() });
       items.push(new ChargeRing(t.clientX, t.clientY, hue, t.identifier));
       spawn(t.clientX, t.clientY, hue, true);
-      playSound(currentMode);
+      // Animal mode plays sound inside spawn(); all others play here
+      if (currentMode !== 'animal') playSound(currentMode);
     }
   }, { passive: false });
 
   cw.addEventListener('touchmove', e => {
     e.preventDefault();
     for (const t of e.changedTouches) {
+      if (currentMode === 'pop') continue;
       const info = touchCharges.get(t.identifier);
       if (info) { info.x = t.clientX; info.y = t.clientY; }
       spawn(t.clientX, t.clientY, shiftHue(t.identifier), false);
@@ -1139,6 +1372,23 @@
   cw.addEventListener('mouseleave', () => endMouse(false));
 
   window.addEventListener('contextmenu', e => e.preventDefault());
+
+  // ── Shake to clear ─────────────────────────────────────────────────────────
+  let lastShake = 0;
+  window.addEventListener('devicemotion', e => {
+    const a = e.accelerationIncludingGravity;
+    if (!a) return;
+    const mag = Math.sqrt(a.x**2 + a.y**2 + a.z**2);
+    const now = Date.now();
+    if (mag > 28 && now - lastShake > 1200) {
+      lastShake = now;
+      // Explode everything outward then clear
+      items.forEach(it => { it.decay = (it.decay ?? 0.01) * 8; it.vx = (it.vx ?? 0) * 3; it.vy = (it.vy ?? 0) * 3; });
+      activeBubbles.forEach(b => { b.alpha = 0; });
+      setTimeout(() => { items = []; activeBubbles = []; }, 400);
+      playSound('firework');
+    }
+  });
 </script>
 </body>
 </html>
